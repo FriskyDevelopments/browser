@@ -1,0 +1,160 @@
+{
+  "_comment": "Zoom Web DOM selector map. Selectors are listed in priority order inside each 'candidates' array. The automation code iterates them until one matches. Update this file whenever Zoom changes its UI — no JavaScript changes needed.",
+
+  "participantListContainer": {
+    "description": "The scrollable list that contains all participant rows.",
+    "candidates": [
+      "[data-testid='participant-list']",
+      ".participants-section-container__participants",
+      ".participants-section",
+      "[aria-label='Participant list']",
+      ".participants-ul"
+    ],
+    "fallbackStrategy": "Search for a UL/OL whose children include raised-hand icons."
+  },
+
+  "participantRow": {
+    "description": "A single participant entry inside the participant list.",
+    "candidates": [
+      "[data-testid='participant-item']",
+      ".participants-item",
+      ".participant-item__container",
+      "li.participants-item"
+    ],
+    "fallbackStrategy": "Iterate all LI elements inside the participant list container."
+  },
+
+  "raisedHandIndicator": {
+    "description": "Element that is visible when a participant has raised their hand.",
+    "candidates": [
+      "[aria-label='Raise Hand']",
+      "[aria-label='Hand raised']",
+      ".participants-item__raise-hand",
+      ".raise-hand-icon",
+      "[data-testid='raise-hand-icon']",
+      "svg[aria-label*='hand' i]",
+      "span.hand-icon"
+    ],
+    "fallbackStrategy": "Search for an element whose text or aria-label contains 'hand' (case-insensitive) within a participant row."
+  },
+
+  "participantName": {
+    "description": "Element holding the display name of a participant.",
+    "candidates": [
+      "[data-testid='participant-name']",
+      ".participants-item__display-name",
+      ".participant-item__display-name",
+      ".participants-item__name",
+      ".participant-name"
+    ],
+    "fallbackStrategy": "First SPAN or P child of the participant row that has non-empty text content."
+  },
+
+  "participantMenuButton": {
+    "description": "The '...' or 'More' button that opens the per-participant action menu.",
+    "candidates": [
+      "[aria-label='More options for participant']",
+      "[data-testid='participant-more-button']",
+      ".participants-item__more-btn",
+      "button[aria-label*='more' i]",
+      "button[aria-label*='options' i]",
+      ".participants-item__action-more"
+    ],
+    "fallbackStrategy": "Find a BUTTON inside the participant row whose aria-label includes 'more' or '...'."
+  },
+
+  "multiPinMenuItem": {
+    "description": "Menu item inside the participant action menu that grants Multi-Pin permission.",
+    "candidates": [
+      "[aria-label='Allow to Multi-Pin']",
+      "[data-testid='allow-multipin']",
+      "li[role='menuitem'] span",
+      "li[role='menuitem']"
+    ],
+    "textMatchKeywords": ["Allow to Multi-Pin", "Multi-Pin", "multipin"],
+    "fallbackStrategy": "Iterate all menu items and match text content against textMatchKeywords."
+  },
+
+  "cameraStatusIndicator": {
+    "description": "Element inside a participant row that reflects whether their camera is on or off.",
+    "candidates": [
+      "[aria-label='Stop Video']",
+      "[aria-label='Start Video']",
+      "[data-testid='video-status-icon']",
+      ".participants-item__video-status",
+      ".video-icon--off",
+      ".video-icon--on",
+      "svg[aria-label*='video' i]"
+    ],
+    "fallbackStrategy": "Look for an element whose aria-label contains 'video' (case-insensitive). Presence of '--off' class or 'Start Video' label implies camera is off.",
+    "notes": "Camera status detection is uncertain in all Zoom Web versions. Treat as best-effort. See Phase 2 in automation-design.md."
+  },
+
+  "chatContainer": {
+    "description": "The container element that holds all chat messages.",
+    "candidates": [
+      "[data-testid='chat-message-list']",
+      ".chat-message__container",
+      ".chatbox-messages",
+      ".chat-list",
+      "[aria-label='Chat message list']"
+    ],
+    "fallbackStrategy": "Find a DIV whose role is 'log' or which contains child elements with chat message text."
+  },
+
+  "chatMessageRow": {
+    "description": "A single chat message entry.",
+    "candidates": [
+      "[data-testid='chat-message']",
+      ".chat-message",
+      ".chatbox-message-item",
+      "li.chat-message"
+    ],
+    "fallbackStrategy": "Iterate all children of the chat container."
+  },
+
+  "chatMessageText": {
+    "description": "The text body of a single chat message row.",
+    "candidates": [
+      "[data-testid='chat-message-text']",
+      ".chat-message__text",
+      ".chatbox-message-content",
+      "span.chat-message-body"
+    ],
+    "fallbackStrategy": "textContent of the chat message row."
+  },
+
+  "chatInput": {
+    "description": "The text input / contenteditable area used to type chat messages.",
+    "candidates": [
+      "[data-testid='chat-input']",
+      "[aria-label='Type message here']",
+      ".chat-box__chat-input",
+      "div[contenteditable='true']",
+      "textarea.chat-message-input"
+    ],
+    "fallbackStrategy": "Find the first contenteditable DIV or TEXTAREA inside the chat panel."
+  },
+
+  "chatSendButton": {
+    "description": "Button that sends a chat message.",
+    "candidates": [
+      "[aria-label='Send chat message']",
+      "[data-testid='chat-send-button']",
+      "button.chat-box__send-btn",
+      "button[aria-label*='send' i]"
+    ],
+    "fallbackStrategy": "Find a BUTTON near the chat input whose text or aria-label contains 'send'."
+  },
+
+  "chatMessageSender": {
+    "description": "Element inside a chat message row that shows the sender's display name.",
+    "candidates": [
+      "[data-testid='chat-message-sender']",
+      ".chat-message__sender",
+      ".chatbox-message-sender",
+      "span.chat-message-author"
+    ],
+    "fallbackStrategy": "Find the first SPAN or element whose class contains 'sender' or 'author' inside the chat message row."
+  }
+}
