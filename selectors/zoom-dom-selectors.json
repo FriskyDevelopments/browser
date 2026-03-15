@@ -1,0 +1,70 @@
+{
+  "_comment": "Zoom Web DOM selectors used by the host automation userscript. Zoom may update its DOM structure at any time. When selectors stop working, update the values here — no changes to the main script are needed.",
+  "_instructions": "Each key maps to a CSS selector string. The script will attempt the primary selector first; if it finds no matching element it falls back to the 'fallback' value. Set 'fallback' to null when no alternative is known.",
+
+  "participantList": {
+    "primary": ".participants-list__list",
+    "fallback": "[aria-label='Participants panel'] ul",
+    "_note": "Container element that holds all participant rows."
+  },
+
+  "participantRow": {
+    "primary": ".participants-item",
+    "fallback": ".participants-list__item",
+    "_note": "Repeating row element for a single participant inside the participant list."
+  },
+
+  "participantName": {
+    "primary": ".participants-item__name",
+    "fallback": ".participants-list__item-name",
+    "_note": "Text element inside a participant row that displays the participant's display name."
+  },
+
+  "raisedHandIcon": {
+    "primary": ".participants-item__raised-hand-icon",
+    "fallback": "[aria-label='Raise Hand'][class*='active']",
+    "_note": "Icon or element that appears inside a participant row when that participant has raised their hand."
+  },
+
+  "participantMenuButton": {
+    "primary": ".participants-item__more-btn",
+    "fallback": "[aria-label='More options for participant']",
+    "_note": "Button inside a participant row that opens the context menu for that participant."
+  },
+
+  "multipinMenuOption": {
+    "primary": "[aria-label='Allow to Multi-Pin']",
+    "fallback": "[role='menuitem']",
+    "_note": "Menu item inside the participant context menu that grants Multi-Pin permission. When the fallback is used, the script MUST additionally validate the element's text content contains 'Multi-Pin' because the fallback selector matches all menu items."
+  },
+
+  "chatSender": {
+    "primary": ".chat-message__sender",
+    "fallback": ".chat-list__item-sender",
+    "_note": "Element inside a chat message row that displays the sender's display name."
+  },
+
+  "cameraStatusIcon": {
+    "primary": ".participants-item__camera-icon--off",
+    "fallback": "[aria-label='Video off']",
+    "_note": "Icon indicating a participant's camera is currently off."
+  },
+
+  "chatContainer": {
+    "primary": ".chat-list__chat-virtualized",
+    "fallback": ".chat-message-list",
+    "_note": "Scrollable container that holds the meeting chat message history."
+  },
+
+  "chatMessage": {
+    "primary": ".chat-message__text",
+    "fallback": ".chat-list__item-content",
+    "_note": "Element inside the chat container that contains the text of a single message."
+  },
+
+  "chatInput": {
+    "primary": ".chat-box__chat-input",
+    "fallback": "[aria-label='Type message here']",
+    "_note": "Text input field in the chat panel where the host types a message."
+  }
+}
