@@ -8,7 +8,8 @@
 // @match        https://*.zoom.us/j/*
 // @match        https://zoom.us/wc/*
 // @match        https://zoom.us/j/*
-// @grant        none
+// @grant        GM_getResourceText
+// @resource     zoomDomSelectors selectors/zoom-dom-selectors.json
 // @run-at       document-start
 // ==/UserScript==
 
@@ -30,38 +31,31 @@
   // How many times to retry opening a participant menu before giving up
   const MAX_MENU_RETRIES = 3;
 
-  // Selectors are loaded from the companion JSON file.
-  // When running as a Tampermonkey script the JSON cannot be imported directly,
-  // so the selectors are embedded here and kept in sync with
-  // selectors/zoom-dom-selectors.json.
-  const SELECTORS = {
-    participantList:
-      ".participants-wrapper__inner, .participants-list__list, [class*='participants-list']",
-    participantRow:
-      ".participants-item, .participants-list__item, [class*='participants-item']",
-    participantName:
-      ".participants-item__display-name, .participants-list__item-name, [class*='display-name']",
-    raisedHandIcon:
-      ".participants-item__raised-hand, [class*='raised-hand'], [aria-label*='Raised Hand'], [aria-label*='raised hand']",
-    participantMenuButton:
-      ".participants-item__action-btn--more, [aria-label='More options'], [aria-label*='more option']",
-    multipinMenuOption:
-      "[aria-label='Allow to Multi-Pin'], [class*='multi-pin']",
-    cameraStatusIcon:
-      ".participants-item__camera, [class*='video-off'], [aria-label*='Camera Off'], [aria-label*='camera off']",
-    chatContainer:
-      ".chat-container__main-body, [class*='chat-container'], #chatPanel",
-    chatMessage:
-      ".chat-message__content, .chat-item, [class*='chat-message']",
-    chatInput:
-      ".chat-compose__inner input, [class*='chat-input'], #chat-input",
-    participantMenuContainer:
-      ".participants-item__actions-menu, .dropdown-menu, [class*='dropdown-menu']",
-    participantListPanel:
-      "#participants-list-panel, .participants-panel, [class*='participants-panel']",
-    participantListButton:
-      "[aria-label='Participants'], [aria-label='participants']",
-  };
+  // Selectors are loaded from the companion JSON file declared as a @resource.
+  // This makes selectors/zoom-dom-selectors.json the single source of truth and
+  // avoids having to manually keep an in-script copy in sync.
+  const SELECTORS = (function () {
+    try {
+      if (typeof GM_getResourceText !== "function") {
+        console.error("[Zoom Host Tools] GM_getResourceText is not available; SELECTORS will be empty.");
+        return {};
+      }
+      const raw = GM_getResourceText("zoomDomSelectors");
+      if (!raw) {
+        console.error("[Zoom Host Tools] Resource 'zoomDomSelectors' not found or empty; SELECTORS will be empty.");
+        return {};
+      }
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") {
+        console.error("[Zoom Host Tools] Parsed selectors resource is not an object; SELECTORS will be empty.");
+        return {};
+      }
+      return parsed;
+    } catch (e) {
+      console.error("[Zoom Host Tools] Failed to load selectors from resource:", e);
+      return {};
+    }
+  })();
 
   // ─────────────────────────────────────────────────────────────────────────────
   // RUNTIME STATE
