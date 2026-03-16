@@ -328,7 +328,7 @@
 
       debug(`WebSocket: raised-hand detected for "${participantName}" (id: ${participantId})`);
 
-      if (participantId || participantName !== "Unknown") {
+      if (participantId && participantName !== "Unknown") {
         registry.upsert({ id: participantId, name: participantName });
         emitZoomEvent("participant_hand_raised", { participantId, participantName });
       }
