@@ -159,7 +159,7 @@ All tuneable values are at the top of the script:
 
 | Constant | Default | Purpose |
 |---|---|---|
-| `DEBUG_MODE` | `true` | Enable verbose console logging |
+| `DEBUG_MODE` | `false` | Enable verbose console logging |
 | `POLL_INTERVAL_MS` | `2000` | DOM fallback polling interval |
 | `ACTION_DELAY_MS` | `500` | Delay between UI interaction steps |
 | `MAX_MENU_RETRIES` | `3` | Max retries for opening participant menu |
