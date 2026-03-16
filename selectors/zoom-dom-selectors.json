@@ -1,0 +1,15 @@
+{
+  "participantList": ".participants-wrapper__inner, .participants-list__list, [class*='participants-list']",
+  "participantRow": ".participants-item, .participants-list__item, [class*='participants-item']",
+  "participantName": ".participants-item__display-name, .participants-list__item-name, [class*='display-name']",
+  "raisedHandIcon": ".participants-item__raised-hand, [class*='raised-hand'], [aria-label*='Raised Hand'], [aria-label*='raised hand']",
+  "participantMenuButton": ".participants-item__action-btn--more, [aria-label='More options'], [aria-label*='more option']",
+  "multipinMenuOption": "[aria-label='Allow to Multi-Pin'], [class*='multi-pin']",
+  "cameraStatusIcon": ".participants-item__camera, [class*='video-off'], [aria-label*='Camera Off'], [aria-label*='camera off']",
+  "chatContainer": ".chat-container__main-body, [class*='chat-container'], #chatPanel",
+  "chatMessage": ".chat-message__content, .chat-item, [class*='chat-message']",
+  "chatInput": ".chat-compose__inner input, [class*='chat-input'], #chat-input",
+  "participantMenuContainer": ".participants-item__actions-menu, .dropdown-menu, [class*='dropdown-menu']",
+  "participantListPanel": "#participants-list-panel, .participants-panel, [class*='participants-panel']",
+  "participantListButton": "[aria-label='Participants'], [aria-label='participants']"
+}
