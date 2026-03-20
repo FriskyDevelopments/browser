@@ -222,15 +222,34 @@
       row.getAttribute('data-id');
     if (explicitId) return `id:${explicitId}`;
 
-    // Fall back to display name
+    // Fall back to display name + a structural fingerprint to avoid collisions
     const nameEl = resolveElement(SELECTORS.participantName, row);
     const name = nameEl ? nameEl.textContent.trim() : '';
-    if (name) return `name:${name}`;
 
-    // Last resort: generate a structural fingerprint
-    const fingerprint = `${row.tagName}:${row.className}:${row.children.length}`;
-    log('warn', 'Could not find stable participant ID; using DOM fingerprint:', fingerprint);
-    return `fp:${fingerprint}`;
+    // Build a more unique fingerprint using DOM structure and sibling index
+    const parent = row.parentElement;
+    let index = -1;
+    if (parent) {
+      const siblings = Array.from(parent.children);
+      index = siblings.indexOf(row);
+    }
+    const fingerprint = [
+      row.tagName || '',
+      row.className || '',
+      String(row.children.length),
+      index >= 0 ? String(index) : ''
+    ].join('|');
+
+    if (name) {
+      const compositeId = `name:${name}|fp:${fingerprint}`;
+      log('debug', 'Using composite participant identifier:', compositeId);
+      return compositeId;
+    }
+
+    // Last resort: use structural fingerprint only
+    const fpOnly = `fp:${fingerprint}`;
+    log('warn', 'Could not find explicit participant ID or name; using DOM fingerprint:', fpOnly);
+    return fpOnly;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
