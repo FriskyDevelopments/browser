@@ -40,6 +40,10 @@
     // Prevents repeated Multi-Pin grants for the same participant.
     processedParticipants: new Set(),
 
+    // Grant queue — ensures Multi-Pin grants are serialised to avoid menu race conditions.
+    grantQueue: [],
+    grantQueueRunning: false,
+
     // Debug panel counters (only used when debug panel is active)
     stats: {
       scans: 0,
@@ -386,6 +390,46 @@
   }
 
   /**
+   * Adds a pending Multi-Pin grant to the serialised queue and starts the
+   * drain loop if it is not already running.
+   *
+   * @param {Element} row           - Participant row element
+   * @param {string}  participantId - Stable participant identifier
+   */
+  function enqueueGrant(row, participantId) {
+    STATE.grantQueue.push({ row, participantId });
+    log('debug', `Queued grant for ${participantId} (queue length: ${STATE.grantQueue.length})`);
+    if (!STATE.grantQueueRunning) {
+      drainGrantQueue();
+    }
+  }
+
+  /**
+   * Drains the grant queue one entry at a time so that only a single
+   * grantMultiPin() call is ever in-flight at once.
+   * This prevents concurrent menu interactions from racing against each other
+   * on the single shared participant-action UI surface.
+   */
+  async function drainGrantQueue() {
+    // JavaScript is single-threaded: the guard check and flag assignment below
+    // execute synchronously before the first await, so no two calls can both
+    // pass the check simultaneously — this is not a TOCTOU race in JS.
+    if (STATE.grantQueueRunning) return;
+    STATE.grantQueueRunning = true;
+    log('debug', 'Grant queue drain started.');
+    while (STATE.grantQueue.length > 0) {
+      const { row, participantId } = STATE.grantQueue.shift();
+      try {
+        await grantMultiPin(row, participantId);
+      } catch (err) {
+        log('error', `Unexpected error while granting Multi-Pin for ${participantId}:`, err);
+      }
+    }
+    STATE.grantQueueRunning = false;
+    log('debug', 'Grant queue drain complete.');
+  }
+
+  /**
    * Core function: opens the participant action menu and clicks "Allow to
    * Multi-Pin". Records the participant in STATE.processedParticipants on
    * success to prevent future reprocessing.
@@ -556,11 +600,9 @@
         continue;
       }
 
-      // Grant Multi-Pin asynchronously; do not await here so the loop
-      // continues scanning other rows without blocking.
-      grantMultiPin(row, participantId).catch(err => {
-        log('error', `Unexpected error while granting multipin for ${participantId}:`, err);
-      });
+      // Enqueue the grant so that Multi-Pin actions are serialised one at a
+      // time, preventing concurrent menu interactions from racing each other.
+      enqueueGrant(row, participantId);
     }
   }
 
