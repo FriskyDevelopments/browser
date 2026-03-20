@@ -1,5 +1,5 @@
 {
-  "_comment": "Zoom Web DOM selector map. Selectors are listed in priority order inside each 'candidates' array. The automation code iterates them until one matches. Update this file whenever Zoom changes its UI — no JavaScript changes needed.",
+  "_comment": "Zoom Web DOM selector map. Selectors are listed in priority order inside each 'candidates' array, and the automation code iterates them until one matches. When Zoom changes its UI, update this file and the corresponding inline SELECTORS map in the userscript to keep them in sync; changing this file alone is not sufficient.",
 
   "participantListContainer": {
     "description": "The scrollable list that contains all participant rows.",
