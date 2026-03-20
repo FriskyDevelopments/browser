@@ -61,13 +61,13 @@
 
   // ─────────────────────────────────────────────────────────────────────────────
   // SELECTOR RESOLUTION
-  // Selectors are loaded from the external JSON at initialisation time so the
-  // mapping can be updated without changing this script.
+  // This userscript embeds an inline selector map so it can run as a single file
+  // without fetching external resources at runtime. To update selectors, edit
+  // /selectors/zoom-dom-selectors.json in the repo (or another reference file)
+  // and manually copy the relevant candidate arrays back into the map below.
   // ─────────────────────────────────────────────────────────────────────────────
 
-  // Inline copy of the selector map so the userscript works as a single file.
-  // To update selectors, edit /selectors/zoom-dom-selectors.json and copy the
-  // relevant candidate arrays back here.
+  // Inline copy of the selector map used by this userscript.
   const SELECTORS = {
     participantListContainer: [
       "[data-testid='participant-list']",
