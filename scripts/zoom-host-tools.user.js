@@ -684,6 +684,11 @@
   /**
    * Creates a small floating debug panel in the bottom-right corner of the page.
    * Only created when CONFIG.DEBUG is true.
+   * The panel is built entirely with DOM APIs — no innerHTML — to prevent any
+   * risk of HTML injection. STATE.stats.lastAction (and any future stat field)
+   * may contain participant display names taken verbatim from the Zoom DOM;
+   * those strings are treated as plain text by textContent and never parsed as
+   * markup.
    */
   function createDebugPanel() {
     if (!CONFIG.DEBUG) return;
@@ -691,24 +696,76 @@
     const panel = document.createElement('div');
     panel.id = 'zoom-host-tools-debug';
 
-    // Inline styles to keep the panel self-contained
+    // Inline styles — self-contained, no external stylesheet needed
     Object.assign(panel.style, {
       position: 'fixed',
-      bottom: '16px',
-      right: '16px',
+      bottom: '20px',
+      right: '20px',
       zIndex: '999999',
-      background: 'rgba(0,0,0,0.82)',
-      color: '#e0e0e0',
-      fontFamily: 'monospace',
+      background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%)',
+      color: '#c8d6e5',
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
       fontSize: '12px',
-      padding: '10px 14px',
-      borderRadius: '8px',
-      minWidth: '220px',
-      lineHeight: '1.6',
-      pointerEvents: 'none', // Does not block clicks
+      padding: '0',
+      borderRadius: '10px',
+      minWidth: '240px',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.55), 0 0 0 1px rgba(110,86,207,0.45)',
+      pointerEvents: 'none',
+      overflow: 'hidden',
     });
 
-    panel.innerHTML = '<strong>🔧 ZoomHostTools</strong><br>Loaded ✓<br>';
+    // ── Header bar ──
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '7px',
+      padding: '8px 12px',
+      background: 'rgba(110,86,207,0.22)',
+      borderBottom: '1px solid rgba(110,86,207,0.35)',
+    });
+
+    const logo = document.createElement('span');
+    logo.textContent = '⚡';
+    logo.style.fontSize = '14px';
+
+    const title = document.createElement('span');
+    title.textContent = 'ZoomHostTools';
+    Object.assign(title.style, {
+      fontWeight: '700',
+      fontSize: '13px',
+      letterSpacing: '0.3px',
+      color: '#a78bfa',
+    });
+
+    const badge = document.createElement('span');
+    badge.textContent = 'LIVE';
+    Object.assign(badge.style, {
+      marginLeft: 'auto',
+      fontSize: '9px',
+      fontWeight: '700',
+      letterSpacing: '0.8px',
+      color: '#4ade80',
+      background: 'rgba(74,222,128,0.12)',
+      border: '1px solid rgba(74,222,128,0.35)',
+      borderRadius: '4px',
+      padding: '1px 5px',
+    });
+
+    header.appendChild(logo);
+    header.appendChild(title);
+    header.appendChild(badge);
+
+    // ── Stats body ──
+    const body = document.createElement('div');
+    body.id = 'zoom-host-tools-debug-body';
+    Object.assign(body.style, {
+      padding: '8px 12px 10px',
+      lineHeight: '1.8',
+    });
+
+    panel.appendChild(header);
+    panel.appendChild(body);
     document.body.appendChild(panel);
     debugPanel = panel;
     log('info', 'Debug panel created.');
@@ -716,17 +773,57 @@
 
   /**
    * Refreshes the debug panel content with current stats.
+   * Each stat row is built with textContent — never innerHTML — so values that
+   * include participant display names (e.g. lastAction = "Multipin granted: Alice<script>…")
+   * are rendered as literal text and cannot inject markup or execute scripts.
    */
   function updateDebugPanel() {
     if (!debugPanel) return;
+
+    const body = debugPanel.querySelector('#zoom-host-tools-debug-body');
+    if (!body) return;
+
+    // Clear previous rows safely
+    while (body.firstChild) body.removeChild(body.firstChild);
+
     const s = STATE.stats;
-    debugPanel.innerHTML = `
-      <strong>🔧 ZoomHostTools</strong><br>
-      Scans: ${s.scans}<br>
-      Raised hands: ${s.raisedHandsFound}<br>
-      Grants attempted: ${s.multipinGrantsAttempted}<br>
-      Last action: ${s.lastAction}
-    `.trim();
+    const rows = [
+      ['🔍 Scans', String(s.scans)],
+      ['✋ Raised hands', String(s.raisedHandsFound)],
+      ['📌 Grants', String(s.multipinGrantsAttempted)],
+      ['⚡ Last action', s.lastAction],
+    ];
+
+    for (const [label, value] of rows) {
+      const row = document.createElement('div');
+      Object.assign(row.style, {
+        display: 'flex',
+        justifyContent: 'space-between',
+        gap: '8px',
+        fontSize: '12px',
+      });
+
+      const labelEl = document.createElement('span');
+      labelEl.textContent = label;
+      labelEl.style.color = '#94a3b8';
+
+      const valueEl = document.createElement('span');
+      // textContent assignment is safe — any HTML in the value is treated as plain text
+      valueEl.textContent = value;
+      Object.assign(valueEl.style, {
+        color: '#e2e8f0',
+        fontWeight: '600',
+        textAlign: 'right',
+        maxWidth: '150px',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      });
+
+      row.appendChild(labelEl);
+      row.appendChild(valueEl);
+      body.appendChild(row);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
