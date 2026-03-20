@@ -174,9 +174,9 @@ SPAM_PATTERNS: [
 - The script runs entirely in the browser under the user's existing Zoom session.
 - No credentials are stored or transmitted.
 - No external resources are loaded.
-- The debug panel uses `innerHTML` with string interpolation; all values
-  inserted are numeric counters or sanitised strings from the DOM — no user
-  input is ever inserted raw.
+- The debug panel uses `innerHTML` with string interpolation for internal
+  status messages; values are numeric counters or strings taken from the Zoom
+  DOM (for example, participant identifiers derived from display names).
 - DOM events dispatched (`mouseover`, `keydown`) are standard synthetic events
   and do not exfiltrate data.
 
