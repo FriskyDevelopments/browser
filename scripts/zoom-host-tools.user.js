@@ -884,6 +884,34 @@
     }, 1000);
   }
 
-  // Kick off
-  waitForZoomReady();
+  // ─────────────────────────────────────────────────────────────────────────────
+  // COMMONJS EXPORT (unit-test harness only)
+  // In the browser (Tampermonkey) `module` is undefined, so the else branch runs
+  // and the script starts normally. In Node.js / Jest, pure-logic helpers are
+  // exported so tests can import them without starting the polling loop.
+  // ─────────────────────────────────────────────────────────────────────────────
+  /* istanbul ignore else */
+  if (typeof module !== 'undefined') {
+    module.exports = {
+      CONFIG,
+      STATE,
+      log,
+      resolveElement,
+      resolveAllElements,
+      getParticipantId,
+      hasRaisedHand,
+      alreadyProcessed,
+      checkMessageForSpam,
+      menuShowsMultiPinAlreadyGranted,
+      findMultiPinMenuItem,
+      enqueueGrant,
+      drainGrantQueue,
+      sleep,
+      hoverRow,
+      closeOpenMenu,
+    };
+  } else {
+    // Kick off
+    waitForZoomReady();
+  }
 })();
