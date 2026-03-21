@@ -185,7 +185,7 @@
      * @returns {Element|null}
      */
     function findMenuItemByText(text) {
-        const items = document.querySelectorAll('.menu-item, [role="menuitem"]');
+        const items = resolveAll('.menu-item, [role="menuitem"]') || [];
         for (const item of items) {
             if (item.textContent && item.textContent.trim().toLowerCase().includes(text.toLowerCase())) {
                 return item;
