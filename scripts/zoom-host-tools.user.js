@@ -416,14 +416,18 @@
             createDebugPanel();
         }
 
-        // Start the polling loop
-        setInterval(async () => {
+        // Start the polling loop without overlapping runs
+        const pollParticipants = async () => {
             try {
                 await scanParticipants();
             } catch (err) {
                 log(`Polling error: ${err.message}`);
+            } finally {
+                setTimeout(pollParticipants, SCAN_INTERVAL);
             }
-        }, SCAN_INTERVAL);
+        };
+        // Schedule the first scan
+        setTimeout(pollParticipants, SCAN_INTERVAL);
 
         // Start chat monitoring; Zoom may render the chat panel lazily,
         // so keep retrying until the container is found (up to ~60 seconds).
