@@ -345,8 +345,14 @@
                     const spamDetected = SPAM_PATTERNS.some(p => lowerText.includes(p));
 
                     if (spamDetected) {
-                        // Extract sender name using the configured selector
-                        const senderEl = resolve('chatSender', node);
+                        // Extract sender name using the configured selector.
+                        // Resolve from a shared parent container so we can find the sender
+                        // even when the mutation node is only the message text element.
+                        const messageRoot =
+                            (msgEl && msgEl.parentElement) ||
+                            (node && node.parentElement) ||
+                            msgEl;
+                        const senderEl = resolve('chatSender', messageRoot);
                         const sender = senderEl ? senderEl.textContent.trim() : 'unknown';
 
                         log(`⚠️  Possible spam detected | user: "${sender}" | message: "${text.trim()}"`);
