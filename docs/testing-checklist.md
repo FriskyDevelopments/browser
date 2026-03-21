@@ -1,4 +1,4 @@
-# Zoom Host Tools — Manual Testing Checklist
+# HostPilot — Manual Testing Checklist
 
 Use this checklist to verify that the script is working correctly in a live or
 test Zoom Web meeting. All tests assume you are logged in with **Host** or
@@ -21,9 +21,9 @@ test Zoom Web meeting. All tests assume you are logged in with **Host** or
 | # | Test | Expected Result | Pass/Fail |
 |---|------|-----------------|-----------|
 | 1.1 | Open a Zoom Web meeting URL | Script matches the `@match` URL patterns | |
-| 1.2 | Check browser console | `[ZoomHostTools] [INFO] Waiting for Zoom Web to be ready…` log appears | |
-| 1.3 | Wait ~5 seconds after meeting loads | `[ZoomHostTools] [INFO] Zoom Web ready. Starting automation.` log appears | |
-| 1.4 | Check bottom-right of page | A small dark debug panel labelled "🔧 ZoomHostTools" appears | |
+| 1.2 | Check browser console | `[HostPilot] [INFO] Waiting for Zoom Web to be ready…` log appears | |
+| 1.3 | Wait ~5 seconds after meeting loads | `[HostPilot] [INFO] Zoom Web ready. Starting automation.` log appears | |
+| 1.4 | Check bottom-right of page | A small dark debug panel labelled "⚡ HostPilot" appears | |
 | 1.5 | Open `about:blank` in a new tab | No script logs appear (URL does not match `@match`) | |
 
 ---
@@ -33,7 +33,7 @@ test Zoom Web meeting. All tests assume you are logged in with **Host** or
 | # | Test | Expected Result | Pass/Fail |
 |---|------|-----------------|-----------|
 | 2.1 | Open the Participants panel in Zoom | Debug panel "Scans" counter increments every ~2.5 seconds | |
-| 2.2 | Test participant raises their hand | Console log: `[ZoomHostTools] [INFO] Detected raised hand: name:<ParticipantName>` | |
+| 2.2 | Test participant raises their hand | Console log: `[HostPilot] [INFO] Detected raised hand: name:<ParticipantName>` | |
 | 2.3 | Test participant lowers their hand | On the next scan, no raised-hand log for that participant | |
 | 2.4 | Close the Participants panel | No error logs appear; scans continue silently | |
 

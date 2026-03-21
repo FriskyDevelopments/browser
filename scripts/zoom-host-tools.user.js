@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Zoom Host Tools – Multi-Pin Auto-Grant
+// @name         HostPilot – Multi-Pin Auto-Grant
 // @namespace    https://github.com/FriskyDevelopments/browser
 // @version      1.0.0
 // @description  Automatically grants Multi-Pin permission to participants who raise their hand in Zoom Web. Requires Host or Co-Host permissions.
@@ -57,7 +57,7 @@
   // LOGGING
   // ─────────────────────────────────────────────────────────────────────────────
   function log(level, ...args) {
-    const prefix = '[ZoomHostTools]';
+    const prefix = '[HostPilot]';
     if (level === 'debug' && !CONFIG.DEBUG) return;
     const fn = level === 'warn' ? console.warn : level === 'error' ? console.error : console.log;
     fn(prefix, `[${level.toUpperCase()}]`, ...args);
@@ -694,7 +694,7 @@
     if (!CONFIG.DEBUG) return;
 
     const panel = document.createElement('div');
-    panel.id = 'zoom-host-tools-debug';
+    panel.id = 'hostpilot-debug';
 
     // Inline styles — self-contained, no external stylesheet needed
     Object.assign(panel.style, {
@@ -730,7 +730,7 @@
     logo.style.fontSize = '14px';
 
     const title = document.createElement('span');
-    title.textContent = 'ZoomHostTools';
+    title.textContent = 'HostPilot';
     Object.assign(title.style, {
       fontWeight: '700',
       fontSize: '13px',
@@ -758,7 +758,7 @@
 
     // ── Stats body ──
     const body = document.createElement('div');
-    body.id = 'zoom-host-tools-debug-body';
+    body.id = 'hostpilot-debug-body';
     Object.assign(body.style, {
       padding: '8px 12px 10px',
       lineHeight: '1.8',
@@ -780,7 +780,7 @@
   function updateDebugPanel() {
     if (!debugPanel) return;
 
-    const body = debugPanel.querySelector('#zoom-host-tools-debug-body');
+    const body = debugPanel.querySelector('#hostpilot-debug-body');
     if (!body) return;
 
     // Clear previous rows safely
@@ -835,7 +835,7 @@
    * Also starts the chat monitor.
    */
   function startMainLoop() {
-    log('info', 'Zoom Host Tools started. Scan interval:', CONFIG.SCAN_INTERVAL_MS, 'ms');
+    log('info', 'HostPilot started. Scan interval:', CONFIG.SCAN_INTERVAL_MS, 'ms');
     createDebugPanel();
     startChatMonitor();
 

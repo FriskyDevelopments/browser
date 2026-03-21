@@ -1,4 +1,4 @@
-# Zoom Host Tools — Automation Design
+# HostPilot — Automation Design
 
 ## Overview
 
