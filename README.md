@@ -1,372 +1,125 @@
-<p align="center">
-  <a href="https://lightpanda.io"><img src="https://cdn.lightpanda.io/assets/images/logo/lpd-logo.png" alt="Logo" height=170></a>
-</p>
+# ✨ Nebulosa
 
-<h1 align="center">Lightpanda Browser</h1>
+**Nebulosa** is a platform for **Zoom automation, moderation, and meeting security**.
 
-<p align="center"><a href="https://lightpanda.io/">lightpanda.io</a></p>
+It provides hosts and co-hosts with **real-time automation tools**, **smart moderation systems**, and **extensible integrations** to simplify meeting management.
 
-<div align="center">
-
-[![License](https://img.shields.io/github/license/lightpanda-io/browser)](https://github.com/lightpanda-io/browser/blob/main/LICENSE)
-[![Twitter Follow](https://img.shields.io/twitter/follow/lightpanda_io)](https://twitter.com/lightpanda_io)
-[![GitHub stars](https://img.shields.io/github/stars/lightpanda-io/browser)](https://github.com/lightpanda-io/browser)
-
-</div>
+Nebulosa helps eliminate repetitive host actions and keeps meetings organized, secure, and easy to run.
 
-Lightpanda is the open-source browser made for headless usage:
-
-- Javascript execution
-- Support of Web APIs (partial, WIP)
-- Compatible with Playwright[^1], Puppeteer, chromedp through [CDP](https://chromedevtools.github.io/devtools-protocol/)
-
-Fast web automation for AI agents, LLM training, scraping and testing:
-
-- Ultra-low memory footprint (9x less than Chrome)
-- Exceptionally fast execution (11x faster than Chrome)
-- Instant startup
-
-[<img width="350px" src="https://cdn.lightpanda.io/assets/images/github/execution-time.svg">
-](https://github.com/lightpanda-io/demo)
-&emsp;
-[<img width="350px" src="https://cdn.lightpanda.io/assets/images/github/memory-frame.svg">
-](https://github.com/lightpanda-io/demo)
-</div>
+---
 
-_Puppeteer requesting 100 pages from a local website on a AWS EC2 m5.large instance.
-See [benchmark details](https://github.com/lightpanda-io/demo)._
-
-[^1]: **Playwright support disclaimer:**
-Due to the nature of Playwright, a script that works with the current version of the browser may not function correctly with a future version. Playwright uses an intermediate JavaScript layer that selects an execution strategy based on the browser's available features. If Lightpanda adds a new [Web API](https://developer.mozilla.org/en-US/docs/Web/API), Playwright may choose to execute different code for the same script. This new code path could attempt to use features that are not yet implemented. Lightpanda makes an effort to add compatibility tests, but we can't cover all scenarios. If you encounter an issue, please create a [GitHub issue](https://github.com/lightpanda-io/browser/issues) and include the last known working version of the script.
+## 🧠 Core Idea
 
-## Quick start
+Zoom meetings often require constant manual intervention:
 
-### Install
-**Install from the nightly builds**
+• granting permissions  
+• managing raised hands  
+• moderating chat  
+• enforcing meeting rules  
+  
+Nebulosa automates these tasks so hosts can focus on the meeting instead of the controls.
 
-You can download the last binary from the [nightly
-builds](https://github.com/lightpanda-io/browser/releases/tag/nightly) for
-Linux x86_64 and MacOS aarch64.
-
-*For Linux*
-```console
-curl -L -o lightpanda https://github.com/lightpanda-io/browser/releases/download/nightly/lightpanda-x86_64-linux && \
-chmod a+x ./lightpanda
-```
+---
 
-*For MacOS*
-```console
-curl -L -o lightpanda https://github.com/lightpanda-io/browser/releases/download/nightly/lightpanda-aarch64-macos && \
-chmod a+x ./lightpanda
-```
+## ⚡ Features
 
-*For Windows + WSL2*
+### Multi-Pin Automation
+Automatically grant **Multi-Pin permissions** when participants raise their hand.
 
-The Lightpanda browser is compatible to run on windows inside WSL. Follow the Linux instruction for installation from a WSL terminal.
-It is recommended to install clients like Puppeteer on the Windows host.
+### Real-Time Meeting Automation
+Detect meeting events such as:
 
-**Install from Docker**
+• participant joins  
+• raised hands  
+• camera status  
+• chat messages  
+  
+and trigger automation workflows.
 
-Lightpanda provides [official Docker
-images](https://hub.docker.com/r/lightpanda/browser) for both Linux amd64 and
-arm64 architectures.
-The following command fetches the Docker image and starts a new container exposing Lightpanda's CDP server on port `9222`.
-```console
-docker run -d --name lightpanda -p 9222:9222 lightpanda/browser:nightly
-```
+### Smart Moderation
+Identify suspicious activity and support moderation actions such as:
 
-### Dump a URL
-
-```console
-./lightpanda fetch --obey_robots --log_format pretty  --log_level info https://demo-browser.lightpanda.io/campfire-commerce/
-```
-```console
-INFO  telemetry : telemetry status . . . . . . . . . . . . .  [+0ms]
-      disabled = false
-
-INFO  page : navigate . . . . . . . . . . . . . . . . . . . . [+6ms]
-      url = https://demo-browser.lightpanda.io/campfire-commerce/
-      method = GET
-      reason = address_bar
-      body = false
-      req_id = 1
+• chat monitoring  
+• spam detection  
+• automated warnings  
+• participant management
 
-INFO  browser : executing script . . . . . . . . . . . . . .  [+118ms]
-      src = https://demo-browser.lightpanda.io/campfire-commerce/script.js
-      kind = javascript
-      cacheable = true
+### Extensible Automation
+Nebulosa is designed to support additional automation modules and custom scripts.
 
-INFO  http : request complete . . . . . . . . . . . . . . . . [+140ms]
-      source = xhr
-      url = https://demo-browser.lightpanda.io/campfire-commerce/json/product.json
-      status = 200
-      len = 4770
+---
 
-INFO  http : request complete . . . . . . . . . . . . . . . . [+141ms]
-      source = fetch
-      url = https://demo-browser.lightpanda.io/campfire-commerce/json/reviews.json
-      status = 200
-      len = 1615
-<!DOCTYPE html>
-```
-
-### Start a CDP server
-
-```console
-./lightpanda serve --obey_robots --log_format pretty  --log_level info --host 127.0.0.1 --port 9222
-```
-```console
-INFO  telemetry : telemetry status . . . . . . . . . . . . .  [+0ms]
-      disabled = false
-
-INFO  app : server running . . . . . . . . . . . . . . . . .  [+0ms]
-      address = 127.0.0.1:9222
-```
+## 🏗 Architecture
 
-Once the CDP server started, you can run a Puppeteer script by configuring the
-`browserWSEndpoint`.
+Nebulosa is built as a lightweight automation system combining several layers:
 
-```js
-'use strict'
+Zoom Web Client  
+↓  
+Event Detection Layer  
+↓  
+Automation Engine  
+↓  
+Host Control Actions
 
-import puppeteer from 'puppeteer-core';
+Key components:
 
-// use browserWSEndpoint to pass the Lightpanda's CDP server address.
-const browser = await puppeteer.connect({
-  browserWSEndpoint: "ws://127.0.0.1:9222",
-});
+• **event detection** (meeting activity)  
+• **automation engine** (decision logic)  
+• **interaction layer** (host actions in Zoom)  
+• **extension modules**
 
-// The rest of your script remains the same.
-const context = await browser.createBrowserContext();
-const page = await context.newPage();
+---
 
-// Dump all the links from the page.
-await page.goto('https://demo-browser.lightpanda.io/amiibo/', {waitUntil: "networkidle0"});
+## 🔧 Current Modules
 
-const links = await page.evaluate(() => {
-  return Array.from(document.querySelectorAll('a')).map(row => {
-    return row.getAttribute('href');
-  });
-});
+The first Nebulosa modules include:
 
-console.log(links);
+• Multi-Pin automation  
+• raised-hand detection  
+• meeting interaction scripts  
+• moderation hooks
 
-await page.close();
-await context.close();
-await browser.disconnect();
-```
+Additional modules will expand automation capabilities over time.
 
-### Telemetry
-By default, Lightpanda collects and sends usage telemetry. This can be disabled by setting an environment variable `LIGHTPANDA_DISABLE_TELEMETRY=true`. You can read Lightpanda's privacy policy at: [https://lightpanda.io/privacy-policy](https://lightpanda.io/privacy-policy).
+---
 
-## Status
+## 🚀 Project Status
 
-Lightpanda is in Beta and currently a work in progress. Stability and coverage are improving and many websites now work.
-You may still encounter errors or crashes. Please open an issue with specifics if so.
+Nebulosa is currently in **active development**.
 
-Here are the key features we have implemented:
+The project focuses first on:
 
-- [x] HTTP loader ([Libcurl](https://curl.se/libcurl/))
-- [x] HTML parser ([html5ever](https://github.com/servo/html5ever))
-- [x] DOM tree
-- [x] Javascript support ([v8](https://v8.dev/))
-- [x] DOM APIs
-- [x] Ajax
-  - [x] XHR API
-  - [x] Fetch API
-- [x] DOM dump
-- [x] CDP/websockets server
-- [x] Click
-- [x] Input form
-- [x] Cookies
-- [x] Custom HTTP headers
-- [x] Proxy support
-- [x] Network interception
-- [x] Respect `robots.txt` with option `--obey_robots`
+• reliable Zoom event detection  
+• stable automation workflows  
+• simple host tools that can be deployed quickly
 
-NOTE: There are hundreds of Web APIs. Developing a browser (even just for headless mode) is a huge task. Coverage will increase over time.
+Future versions will expand moderation tools and integrations.
 
-You can also follow the progress of our Javascript support in our dedicated [zig-js-runtime](https://github.com/lightpanda-io/zig-js-runtime#development) project.
+---
 
-## Build from sources
+## 🌌 Vision
 
-### Prerequisites
+Nebulosa aims to become a **powerful automation platform for Zoom hosts**, providing tools that simplify meeting management while remaining lightweight and flexible.
 
-Lightpanda is written with [Zig](https://ziglang.org/) `0.15.2`. You have to
-install it with the right version in order to build the project.
+Automation should feel natural and unobtrusive — working quietly in the background to help meetings run smoothly.
 
-Lightpanda also depends on
-[zig-js-runtime](https://github.com/lightpanda-io/zig-js-runtime/) (with v8),
-[Libcurl](https://curl.se/libcurl/) and [html5ever](https://github.com/servo/html5ever).
+---
 
-To be able to build the v8 engine for zig-js-runtime, you have to install some libs:
+## 🐾 Frisky Origins
 
-For **Debian/Ubuntu based Linux**:
+Made with a **Frisky Paw and a brave little heart**—  
+for every soul who dares to shine on Zoom. ✨
 
-```
-sudo apt install xz-utils ca-certificates \
-    pkg-config libglib2.0-dev \
-    clang make curl git
-```
-You also need to [install Rust](https://rust-lang.org/tools/install/).
+---
 
-For systems with [**Nix**](https://nixos.org/download/), you can use the devShell:
-```
-nix develop
-```
+## 🤝 Contributing
 
-For **MacOS**, you need cmake and [Rust](https://rust-lang.org/tools/install/).
-```
-brew install cmake
-```
+Nebulosa is an evolving project and contributions are welcome.
 
-### Build and run
+Ideas, improvements, and automation modules are encouraged.
 
-You an build the entire browser with `make build` or `make build-dev` for debug
-env.
+---
 
-But you can directly use the zig command: `zig build run`.
+## 📜 License
 
-#### Embed v8 snapshot
-
-Lighpanda uses v8 snapshot. By default, it is created on startup but you can
-embed it by using the following commands:
-
-Generate the snapshot.
-```
-zig build snapshot_creator -- src/snapshot.bin
-```
-
-Build using the snapshot binary.
-```
-zig build -Dsnapshot_path=../../snapshot.bin
-```
-
-See [#1279](https://github.com/lightpanda-io/browser/pull/1279) for more details.
-
-## Test
-
-### Unit Tests
-
-You can test Lightpanda by running `make test`.
-
-### End to end tests
-
-To run end to end tests, you need to clone the [demo
-repository](https://github.com/lightpanda-io/demo) into `../demo` dir.
-
-You have to install the [demo's node
-requirements](https://github.com/lightpanda-io/demo?tab=readme-ov-file#dependencies-1)
-
-You also need to install [Go](https://go.dev) > v1.24.
-
-```
-make end2end
-```
-
-### Web Platform Tests
-
-Lightpanda is tested against the standardized [Web Platform
-Tests](https://web-platform-tests.org/).
-
-We use [a fork](https://github.com/lightpanda-io/wpt/tree/fork) including a custom
-[`testharnessreport.js`](https://github.com/lightpanda-io/wpt/commit/01a3115c076a3ad0c84849dbbf77a6e3d199c56f).
-
-For reference, you can easily execute a WPT test case with your browser via
-[wpt.live](https://wpt.live).
-
-#### Configure WPT HTTP server
-
-To run the test, you must clone the repository, configure the custom hosts and generate the
-`MANIFEST.json` file.
-
-Clone the repository with the `fork` branch.
-```
-git clone -b fork --depth=1 git@github.com:lightpanda-io/wpt.git
-```
-
-Enter into the `wpt/` dir.
-
-Install custom domains in your `/etc/hosts`
-```
-./wpt make-hosts-file | sudo tee -a /etc/hosts
-```
-
-Generate `MANIFEST.json`
-```
-./wpt manifest
-```
-Use the [WPT's setup
-guide](https://web-platform-tests.org/running-tests/from-local-system.html) for
-details.
-
-#### Run WPT test suite
-
-An external [Go](https://go.dev) runner is provided by
-[github.com/lightpanda-io/demo/](https://github.com/lightpanda-io/demo/)
-repository, located into `wptrunner/` dir.
-You need to clone the project first.
-
-First start the WPT's HTTP server from your `wpt/` clone dir.
-```
-./wpt serve
-```
-
-Run a Lightpanda browser
-
-```
-zig build run -- --insecure_disable_tls_host_verification
-```
-
-Then you can start the wptrunner from the Demo's clone dir:
-```
-cd wptrunner && go run .
-```
-
-Or one specific test:
-
-```
-cd wptrunner && go run . Node-childNodes.html
-```
-
-`wptrunner` command accepts `--summary` and `--json` options modifying output.
-Also `--concurrency` define the concurrency limit.
-
-:warning: Running the whole test suite will take a long time. In this case,
-it's useful to build in `releaseFast` mode to make tests faster.
-
-```
-zig build -Doptimize=ReleaseFast run
-```
-
-## Contributing
-
-Lightpanda accepts pull requests through GitHub.
-
-You have to sign our [CLA](CLA.md) during the pull request process otherwise
-we're not able to accept your contributions.
-
-## Why?
-
-### Javascript execution is mandatory for the modern web
-
-In the good old days, scraping a webpage was as easy as making an HTTP request, cURL-like. It’s not possible anymore, because Javascript is everywhere, like it or not:
-
-- Ajax, Single Page App, infinite loading, “click to display”, instant search, etc.
-- JS web frameworks: React, Vue, Angular & others
-
-### Chrome is not the right tool
-
-If we need Javascript, why not use a real web browser? Take a huge desktop application, hack it, and run it on the server. Hundreds or thousands of instances of Chrome if you use it at scale. Are you sure it’s such a good idea?
-
-- Heavy on RAM and CPU, expensive to run
-- Hard to package, deploy and maintain at scale
-- Bloated, lots of features are not useful in headless usage
-
-### Lightpanda is built for performance
-
-If we want both Javascript and performance in a true headless browser, we need to start from scratch. Not another iteration of Chromium, really from a blank page. Crazy right? But that’s what we did:
-
-- Not based on Chromium, Blink or WebKit
-- Low-level system programming language (Zig) with optimisations in mind
-- Opinionated: without graphical rendering
+License details will be defined as the project evolves.
