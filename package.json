@@ -1,0 +1,18 @@
+{
+  "name": "zoom-host-tools-tests",
+  "private": true,
+  "description": "Unit test harness for zoom-host-tools.user.js pure-logic helpers",
+  "scripts": {
+    "test": "jest --no-coverage"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
+  }
+}

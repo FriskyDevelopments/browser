@@ -1,0 +1,48 @@
+name: HostPilot unit tests
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/zoom-host-tools.user.js"
+      - "tests/**"
+      - "package.json"
+      - ".github/workflows/hostpilot-test.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/zoom-host-tools.user.js"
+      - "tests/**"
+      - "package.json"
+      - ".github/workflows/hostpilot-test.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Jest / JSDOM unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Don't run the CI with draft PRs.
+    if: github.event.pull_request.draft == false
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.MASTERKEYGITHUB }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.MASTERKEYGITHUB }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test

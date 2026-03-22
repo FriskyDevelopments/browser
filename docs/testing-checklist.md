@@ -1,173 +1,127 @@
-# Zoom Co-Host Multi-Pin Automation — Testing Checklist
+# HostPilot — Manual Testing Checklist
 
-Use this checklist to verify the automation before deploying it in a live
-meeting.  Each section corresponds to a functional area of the script.
-
----
-
-## Pre-Flight
-
-- [ ] Tampermonkey (or Violentmonkey) is installed in the browser
-- [ ] The userscript is installed from `scripts/zoom-host-tools.user.js`
-- [ ] The script is **enabled** in the Tampermonkey dashboard
-- [ ] You are signed into Zoom Web as a Host or Co-Host
-- [ ] Browser console is open (F12) to monitor `[ZoomHostTools]` output
+Use this checklist to verify that the script is working correctly in a live or
+test Zoom Web meeting. All tests assume you are logged in with **Host** or
+**Co-Host** permissions.
 
 ---
 
-## 1. Script Load
+## Prerequisites
 
-- [ ] Navigating to `https://*.zoom.us/wc/<id>/join` shows the following console message:
-  ```
-  [ZoomHostTools] [INFO] Zoom Co-Host Multi-Pin Automation initialising…
-  ```
-- [ ] The following message appears shortly after:
-  ```
-  [ZoomHostTools] [INFO] Zoom Co-Host Multi-Pin Automation ready
-  ```
-- [ ] No uncaught JavaScript errors appear in the console during load
+- [ ] Tampermonkey (or Violentmonkey) extension installed in Chrome / Firefox / Edge
+- [ ] `zoom-host-tools.user.js` installed in Tampermonkey and enabled
+- [ ] A test Zoom Web meeting open at `https://*.zoom.us/wc/*` or `https://*.zoom.us/j/*`
+- [ ] At least two participants in the meeting (one as host/co-host, one as a test participant)
+- [ ] Browser DevTools console open (F12 → Console) so you can read script logs
 
 ---
 
-## 2. WebSocket Interceptor
+## 1 — Script Load
 
-- [ ] Console shows:
-  ```
-  [ZoomHostTools] [INFO] WebSocket interceptor installed
-  ```
-- [ ] When a participant raises their hand, the console shows a `WebSocket JSON
-  frame` debug line (if `DEBUG_MODE = true`)
-- [ ] A `participant_hand_raised` event is emitted via the WebSocket path
-  (look for `[ZoomHostTools] [DEBUG] Event emitted: participant_hand_raised`)
-
----
-
-## 3. DOM Fallback Polling
-
-- [ ] Console shows:
-  ```
-  [ZoomHostTools] [INFO] DOM fallback polling started (interval: 2000ms)
-  ```
-- [ ] When a participant raises their hand and the WebSocket path does **not**
-  emit an event, the DOM fallback emits `participant_hand_raised` within ~2 s
-- [ ] Console shows a `DOM scan:` debug line confirming the raised-hand icon
-  was detected
+| # | Test | Expected Result | Pass/Fail |
+|---|------|-----------------|-----------|
+| 1.1 | Open a Zoom Web meeting URL | Script matches the `@match` URL patterns | |
+| 1.2 | Check browser console | `[HostPilot] [INFO] Waiting for Zoom Web to be ready…` log appears | |
+| 1.3 | Wait ~5 seconds after meeting loads | `[HostPilot] [INFO] Zoom Web ready. Starting automation.` log appears | |
+| 1.4 | Check bottom-right of page | A small dark debug panel labelled "⚡ HostPilot" appears | |
+| 1.5 | Open `about:blank` in a new tab | No script logs appear (URL does not match `@match`) | |
 
 ---
 
-## 4. Multi-Pin Grant — Happy Path
+## 2 — Raised Hand Detection
 
-- [ ] A second browser session joins as a non-host participant
-- [ ] The participant raises their hand
-- [ ] Within a few seconds the console shows:
-  ```
-  [ZoomHostTools] [INFO] Attempting to grant Multi-Pin to "<name>"
-  [ZoomHostTools] [INFO] Multi-Pin granted to "<name>"
-  ```
-- [ ] The participant's entry in the Participants panel shows they now have
-  Multi-Pin permission (typically indicated by a pin icon or a label)
-- [ ] The console does **not** show a second grant attempt for the same
-  participant after the first succeeds
+| # | Test | Expected Result | Pass/Fail |
+|---|------|-----------------|-----------|
+| 2.1 | Open the Participants panel in Zoom | Debug panel "Scans" counter increments every ~2.5 seconds | |
+| 2.2 | Test participant raises their hand | Console log: `[HostPilot] [INFO] Detected raised hand: name:<ParticipantName>` | |
+| 2.3 | Test participant lowers their hand | On the next scan, no raised-hand log for that participant | |
+| 2.4 | Close the Participants panel | No error logs appear; scans continue silently | |
 
 ---
 
-## 5. Duplicate Prevention
+## 3 — Multi-Pin Grant (Phase 1 — Core Feature)
 
-- [ ] Raise the same participant's hand a second time (lower it first, then
-  raise again)
-- [ ] Console shows:
-  ```
-  [ZoomHostTools] [INFO] "<name>" already has Multi-Pin – skipping
-  ```
-- [ ] No second Multi-Pin grant UI interaction is attempted
-
----
-
-## 6. Retry Logic
-
-- [ ] (Simulate by temporarily hiding the "More options" button via DevTools)
-- [ ] Console shows retry messages:
-  ```
-  [ZoomHostTools] [WARN] grantMultipin: menu button not found for "<name>" (attempt 1)
-  [ZoomHostTools] [WARN] grantMultipin: menu button not found for "<name>" (attempt 2)
-  ```
-- [ ] After `MAX_MENU_RETRIES` attempts, an error is logged and the function exits cleanly
+| # | Test | Expected Result | Pass/Fail |
+|---|------|-----------------|-----------|
+| 3.1 | Test participant raises their hand (first time) | Console: `[INFO] Granting multipin for participant: name:<ParticipantName>` | |
+| 3.2 | Same scan | Participant's action menu opens briefly and closes | |
+| 3.3 | Same scan | Console: `[INFO] Multi-Pin granted successfully for participant: name:<ParticipantName>` | |
+| 3.4 | Verify in Zoom | Participant now has Multi-Pin permission (visible in Zoom participant list or menu) | |
+| 3.5 | Debug panel | "Grants attempted" counter increments by 1 | |
 
 ---
 
-## 7. Chat Spam Monitor
+## 4 — Deduplication (No Repeated Grants)
 
-- [ ] Console shows:
-  ```
-  [ZoomHostTools] [INFO] Chat spam monitor started
-  ```
-  (may be deferred by ~5 s after page load)
-- [ ] When a chat message containing `http://`, `https://`, `t.me/`, `bit.ly/`,
-  or `discord.gg/` is sent by a participant, the console shows:
-  ```
-  [ZoomHostTools] [WARN] Chat spam detected from "<name>": <message>
-  ```
-- [ ] No moderation action is taken (Phase 3 is scaffold only)
+| # | Test | Expected Result | Pass/Fail |
+|---|------|-----------------|-----------|
+| 4.1 | Keep test participant's hand raised after grant | On next scan, console: `[DEBUG] Participant already processed, skipping: name:<ParticipantName>` | |
+| 4.2 | Test participant lowers and re-raises hand | Participant is already in the processed set — no repeated grant | |
+| 4.3 | Reload the page and repeat 3.1 | Grant executes again (state was reset on reload — expected) | |
 
 ---
 
-## 8. Selector Health Check
+## 5 — Error Handling and Selector Failures
 
-Run the following in the browser console to verify selectors resolve against
-the live Zoom DOM:
-
-```js
-const S = {
-  participantList: ".participants-wrapper__inner, .participants-list__list, [class*='participants-list']",
-  participantRow: ".participants-item, .participants-list__item, [class*='participants-item']",
-  participantName: ".participants-item__display-name, .participants-list__item-name, [class*='display-name']",
-  raisedHandIcon: ".participants-item__raised-hand, [class*='raised-hand'], [aria-label*='Raised Hand'], [aria-label*='raised hand']",
-  participantMenuButton: ".participants-item__action-btn--more, [aria-label='More options'], [aria-label*='more option']",
-  multipinMenuOption: "[aria-label='Allow to Multi-Pin'], [class*='multi-pin']",
-};
-Object.entries(S).forEach(([name, sel]) => {
-  const el = document.querySelector(sel);
-  console.log(name, el ? "✅ FOUND" : "❌ NOT FOUND", sel);
-});
-```
-
-- [ ] `participantList` — ✅ FOUND
-- [ ] `participantRow` — ✅ FOUND (at least one participant visible)
-- [ ] `participantName` — ✅ FOUND
-- [ ] `raisedHandIcon` — ✅ FOUND (only when someone has their hand raised)
-- [ ] `participantMenuButton` — ✅ FOUND (hover over a row first)
-- [ ] `multipinMenuOption` — ✅ FOUND (only when the "More options" menu is open)
-
-If any selector returns ❌, update `selectors/zoom-dom-selectors.json` and the
-corresponding entry in the `SELECTORS` constant inside the userscript.
+| # | Test | Expected Result | Pass/Fail |
+|---|------|-----------------|-----------|
+| 5.1 | Temporarily change a selector in `SELECTORS` to `"[data-testid='does-not-exist']"` | Console: `[WARN] Failed to find menu button for participant: …` — script does NOT crash | |
+| 5.2 | Open a non-Zoom HTTPS page | No logs, no debug panel (URL does not match) | |
+| 5.3 | Revoke Co-Host before a grant attempt | Menu opens; "Allow to Multi-Pin" is absent; console: `[WARN] Failed to find Multi-Pin menu item for participant: …` | |
+| 5.4 | Use DevTools to delete the participant list container from the DOM | Console: `[DEBUG] Participant list container not found` — script continues to run | |
 
 ---
 
-## 9. DEBUG_MODE Toggle
+## 6 — Selector Debugging Workflow
 
-- [ ] Set `DEBUG_MODE = false` inside the script
-- [ ] Reload the meeting page
-- [ ] Confirm that `[DEBUG]` lines no longer appear in the console
-- [ ] Confirm that `[INFO]` and `[WARN]` lines still appear
-
----
-
-## 10. Edge Cases
-
-- [ ] Participant joins the meeting after the script has loaded → still
-  detected and processed correctly
-- [ ] Multiple participants raise their hand at the same time → all receive
-  Multi-Pin grants (each handled independently)
-- [ ] Participant raises hand before the Participants panel has been opened →
-  script opens the panel automatically before acting
-- [ ] Zoom UI updates cause a selector to stop matching → DOM fallback
-  continues working for any selector that still matches; logs indicate which
-  selector failed
+| # | Test | Expected Result | Pass/Fail |
+|---|------|-----------------|-----------|
+| 6.1 | Enable `CONFIG.DEBUG = true` | All `[DEBUG]` logs visible in console | |
+| 6.2 | Trigger a participant scan | Console shows `[DEBUG] Selector matched: "<selector>"` for each element found | |
+| 6.3 | Update a selector to a new value in the script | Console immediately shows the new selector in the "matched" log | |
+| 6.4 | View `selectors/zoom-dom-selectors.json` | File contains `candidates` arrays and `fallbackStrategy` notes for every element | |
 
 ---
 
-## Known Issues / Out of Scope
+## 7 — Phase 2 Camera Check (Scaffold Verification)
 
-- Phase 2 (camera warning chat message) is not yet implemented — `sendCameraWarning()` will throw if called.
-- Phase 3 (moderation actions) is not yet implemented — `warnUser()`, `moveToWaitingRoom()`, and `removeParticipant()` will throw if called.
-- Binary WebSocket frames (protobuf) are not decoded; these fall through to the DOM fallback.
+| # | Test | Expected Result | Pass/Fail |
+|---|------|-----------------|-----------|
+| 7.1 | Grant Multi-Pin to a participant with camera ON | Console: `[INFO] Camera appears ON for participant: …` OR `[DEBUG] Camera status: unable to detect…` | |
+| 7.2 | Grant Multi-Pin to a participant with camera OFF | Console: `[INFO] Camera is OFF for participant: …` OR `[DEBUG] Camera status: unable to detect…` | |
+| 7.3 | Review Phase 2 TODO comments in script | `checkCameraStatus()` contains clear `// TODO (Phase 2):` comments describing next steps | |
+
+---
+
+## 8 — Phase 3 Chat Monitoring (Scaffold Verification)
+
+| # | Test | Expected Result | Pass/Fail |
+|---|------|-----------------|-----------|
+| 8.1 | Send a normal chat message | No warning log | |
+| 8.2 | Send a chat message containing `https://example.com` | Console: `[WARN] Potential spam detected from "…": …` | |
+| 8.3 | Send a message containing `t.me/something` | Console: `[WARN] Potential spam detected from "…": …` | |
+| 8.4 | Send a message containing `discord.gg/invite` | Console: `[WARN] Potential spam detected from "…": …` | |
+| 8.5 | Review Phase 3 TODO comments in script | `checkMessageForSpam()` has clear `// TODO (Phase 3):` comments for future moderation actions | |
+
+---
+
+## 9 — Extension and Maintainability
+
+| # | Test | Expected Result | Pass/Fail |
+|---|------|-----------------|-----------|
+| 9.1 | Read `docs/automation-design.md` | Architecture, assumptions, and extension points are clearly documented | |
+| 9.2 | Find all `// TODO` comments in the script | Each TODO belongs to a clearly labelled Phase (2 or 3) | |
+| 9.3 | Identify where to add a new spam pattern | `CONFIG.SPAM_PATTERNS` array at the top of the script — one line to add | |
+| 9.4 | Identify where to update a broken selector | `SELECTORS` constant in the script and matching entry in `selectors/zoom-dom-selectors.json` | |
+
+---
+
+## Notes
+
+- Zoom Web's DOM structure can change with any Zoom update. If any test in
+  section 3 fails, compare the live DOM in DevTools against the selectors in
+  `SELECTORS` and update the `candidates` arrays.
+- Camera detection (section 7) is explicitly best-effort. Failure to detect
+  camera state is not a bug — see Phase 2 design notes in `automation-design.md`.
+- All Phase 3 chat tests only verify logging; no automated moderation action
+  should be triggered at this stage.

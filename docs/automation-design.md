@@ -1,175 +1,192 @@
-# Zoom Co-Host Multi-Pin Automation — Design
+# HostPilot — Automation Design
 
 ## Overview
 
-`scripts/zoom-host-tools.user.js` is a Tampermonkey userscript that automatically
-grants **Multi-Pin** permissions to Zoom Web meeting participants who raise their
-hand.  It runs entirely in the browser under a Host or Co-Host account and
-requires no external infrastructure.
+`zoom-host-tools.user.js` is a Tampermonkey userscript that automates routine
+Host / Co-Host tasks inside the **Zoom Web** client (`*.zoom.us/wc/*` and
+`*.zoom.us/j/*`). It runs entirely in the browser — no backend, no external
+services, no Zoom API credentials required.
+
+The script is structured in **three phases**:
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| 1 | **Fully implemented** | Detect raised hands → auto-grant Multi-Pin |
+| 2 | Scaffold | After Multi-Pin grant, check camera state; optionally send a reminder |
+| 3 | Scaffold | Monitor chat for spam/suspicious links |
 
 ---
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                     Tampermonkey Script                      │
-│                                                              │
-│  ┌─────────────────────┐   ┌────────────────────────────┐   │
-│  │  WebSocket          │   │  DOM Fallback              │   │
-│  │  Interceptor        │   │  (setInterval poll)        │   │
-│  │  (monkey-patch)     │   │                            │   │
-│  └──────────┬──────────┘   └────────────┬───────────────┘   │
-│             │                           │                    │
-│             ▼                           ▼                    │
-│       emitZoomEvent("participant_hand_raised", ...)          │
-│                         │                                    │
-│                         ▼                                    │
-│              ┌──────────────────────┐                        │
-│              │  Internal Event Bus  │                        │
-│              │  onZoomEvent(...)    │                        │
-│              └──────────┬───────────┘                        │
-│                         │                                    │
-│                         ▼                                    │
-│              ┌──────────────────────┐                        │
-│              │  Automation Logic    │                        │
-│              │  grantMultipin(name) │                        │
-│              └──────────┬───────────┘                        │
-│                         │                                    │
-│                         ▼                                    │
-│              ┌──────────────────────┐                        │
-│              │  Participant         │                        │
-│              │  Registry            │                        │
-│              └──────────────────────┘                        │
-└──────────────────────────────────────────────────────────────┘
+zoom-host-tools.user.js
+│
+├── CONFIG              Global tuning knobs (intervals, retries, debug flag)
+├── STATE               Runtime state (processed participants set, debug stats)
+│
+├── Logging layer       log(level, ...args) — respects CONFIG.DEBUG
+│
+├── Selector layer      SELECTORS map + resolveElement() + resolveAllElements()
+│   └── Falls back through candidates array; logs selector mismatches as warnings
+│
+├── Participant identity  getParticipantId(row) — stable ID, name, or fingerprint
+│
+├── Phase 1 — Multi-Pin
+│   ├── hasRaisedHand(row)
+│   ├── alreadyProcessed(participantId)
+│   ├── grantMultiPin(row, participantId)   ← async, handles menu open/click/retry
+│   └── scanParticipants()                 ← called every SCAN_INTERVAL_MS
+│
+├── Phase 2 scaffold
+│   └── checkCameraStatus(row, participantId)   ← called after every grant
+│
+├── Phase 3 scaffold
+│   ├── checkMessageForSpam(text, sender)
+│   └── startChatMonitor()                ← MutationObserver on chat container
+│
+├── Debug panel         createDebugPanel() / updateDebugPanel()
+│
+└── Entry point         waitForZoomReady() → startMainLoop()
 ```
 
 ---
 
-## Components
+## DOM Strategy
 
-### 1. WebSocket Interceptor (Primary Detection)
+### Selector Mapping Layer
 
-`installWebSocketInterceptor()` monkey-patches `window.WebSocket` before Zoom's
-application code runs (`@run-at document-start`).  Every incoming message is
-inspected by `handleWebSocketMessage()` / `tryParseZoomFrame()`.
+All CSS selectors are defined in two places that must be kept in sync:
 
-Zoom sends both JSON and binary (protobuf-like) frames.  The interceptor handles
-both and emits `participant_hand_raised` when a raised-hand pattern is detected.
+1. **`/selectors/zoom-dom-selectors.json`** — canonical source of truth. Edit
+   this file to update selectors after a Zoom UI change. The JSON contains
+   multiple `candidates` per element, plus human-readable fallback notes.
 
-Because Zoom's WebSocket protocol is proprietary and undocumented, heuristic
-matching is used.  If the protocol changes the DOM fallback ensures continuity.
+2. **`SELECTORS` constant in `zoom-host-tools.user.js`** — an inline copy of
+   the candidate arrays so the userscript works as a single self-contained file.
 
-### 2. DOM Fallback (setInterval polling)
+When Zoom changes its DOM, update the JSON first, then copy the relevant
+`candidates` arrays into the `SELECTORS` constant in the script.
 
-`scanParticipants()` runs every 2 seconds and inspects every participant row for
-the raised-hand icon element (using `SELECTORS.raisedHandIcon`).  When found it
-emits `participant_hand_raised`.
+### Fallback Strategy (per element)
 
-Duplicate events are suppressed by checking `registry.hasMultipin()` before
-emitting.
+```
+Priority 1 → data-testid attribute selectors   (most stable; Zoom uses these internally)
+Priority 2 → explicit aria-label attribute      (accessibility labels; change less often)
+Priority 3 → class name selectors               (liable to change with UI rebuilds)
+Priority 4 → text content / aria-label keywords (last resort; language-dependent)
+Priority 5 → structural DOM traversal           (absolute fallback)
+```
 
-### 3. Internal Event Bus
+`resolveElement()` iterates the `candidates` array and returns the first match.
+A `[WARN]` log is emitted for any selector that throws (malformed selector) and
+a `[DEBUG]` log for every successful match, making selector debugging easy.
 
-A lightweight pub/sub system:
+---
+
+## Assumptions
+
+1. **Permissions** — The script assumes the logged-in Zoom user has Host or
+   Co-Host permissions. It does not verify this; attempting actions without
+   permissions will simply result in the menu item being absent or greyed out.
+
+2. **Participant panel must be open** — The script can only scan participants
+   when the Participants panel is visible. If it is closed, `getParticipantListContainer()`
+   returns `null` and the scan is skipped silently.
+
+3. **Hover reveals menu button** — Zoom hides the "…" (More) button until the
+   participant row is hovered. The script dispatches synthetic `mouseover` /
+   `mouseenter` / `mousemove` events to reveal it before looking for the button.
+   This approach may break if Zoom adds a CSP or replaces hover with a click
+   trigger.
+
+4. **Single-session state** — `STATE.processedParticipants` is an in-memory
+   `Set`. It is reset when the page reloads (e.g. the user rejoins the meeting).
+   This is intentional: a participant who left and rejoin should be re-evaluated.
+
+5. **Multi-Pin menu item text** — The "Allow to Multi-Pin" text is used as the
+   final fallback. If Zoom localises this string, `MULTIPIN_TEXT_KEYWORDS` in
+   the script must be updated.
+
+6. **Camera detection is uncertain** — Zoom Web does not expose a reliable
+   DOM-level camera on/off indicator in all versions. Phase 2's camera check is
+   best-effort; it logs the result but does not act on uncertainty.
+
+---
+
+## Extension Points
+
+### Adding a new Phase 2 action
+
+After `grantMultiPin()` calls `checkCameraStatus()`, add your logic inside that
+function:
 
 ```js
-emitZoomEvent(type, payload)   // publish
-onZoomEvent(type, handler)     // subscribe
+if (cameraOff) {
+  // Phase 2: send one-time chat message
+  await sendChatMessage(participantName, 'Please turn your camera on to use Multi-Pin.');
+}
 ```
 
-This decouples detection from action, making it easy to add more listeners
-(e.g. logging, analytics) without modifying detection code.
+Implement `sendChatMessage(target, message)` using the chat input selectors in
+`SELECTORS.chatInput` and `SELECTORS.chatSendButton`.
 
-### 4. Participant Registry
+### Adding a Phase 3 moderation action
 
-An in-memory store tracking:
+Inside `checkMessageForSpam()`, replace the `// TODO` comment with a call to
+your moderation function:
 
-| Field | Type | Purpose |
-|---|---|---|
-| `participantsById` | `Map<string, object>` | Lookup by Zoom numeric ID |
-| `participantsByName` | `Map<string, object>` | Lookup by display name |
-| `multipinGranted` | `Set<string>` | IDs / names that have Multi-Pin |
-| `cameraWarningSent` | `Set<string>` | IDs / names that received camera warning |
-
-The registry is reset on page reload (single-page app navigations may need special handling — see Known Limitations).
-
-### 5. Multi-Pin Action Executor
-
-`grantMultipin(participantName)` drives the Zoom Web UI to grant Multi-Pin:
-
-1. Ensure the Participants panel is open.
-2. Find the participant's row.
-3. Hover to reveal action buttons.
-4. Click the "More options" (`…`) button.
-5. Click "Allow to Multi-Pin" in the dropdown.
-6. Mark the participant in the registry.
-
-Retry logic (up to `MAX_MENU_RETRIES = 3`) handles timing issues with UI animations.
-
-### 6. Selector Configuration
-
-All CSS selectors are maintained in `selectors/zoom-dom-selectors.json` and
-mirrored in the `SELECTORS` constant inside the script.  When Zoom updates its
-CSS class names, only these two files need to be updated.
-
----
-
-## Detection Hierarchy
-
-```
-1. WebSocket message → participant_hand_raised  (fast, ~real-time)
-         ↓ (if WebSocket frame not parseable)
-2. DOM poll every 2 s → participant_hand_raised  (fallback, slightly delayed)
+```js
+if (pattern.test(text)) {
+  log('warn', `Spam detected from "${sender}": ${text}`);
+  await moderateUser(sender);  // e.g. mute, remove, or warn
+}
 ```
 
-Both paths converge on the same internal event, so automation logic is
-identical regardless of detection method.
+### Adding new spam patterns
+
+Edit `CONFIG.SPAM_PATTERNS` at the top of the script. Each entry is a
+`RegExp`:
+
+```js
+SPAM_PATTERNS: [
+  /https?:\/\//i,
+  /t\.me\//i,
+  /yournewthing\.com/i,  // <-- add here
+],
+```
+
+### Updating selectors after a Zoom UI change
+
+1. Open the Zoom Web client in Chrome DevTools.
+2. Inspect the affected element.
+3. Update the `candidates` array for that element in
+   `/selectors/zoom-dom-selectors.json`.
+4. Copy the updated array into the matching entry in the `SELECTORS` constant
+   in `zoom-host-tools.user.js`.
+5. Reload the script in Tampermonkey and verify in the browser console that the
+   `[DEBUG] Selector matched` log points at your new selector.
 
 ---
 
-## Phase Roadmap
+## Security Considerations
 
-| Phase | Status | Description |
-|---|---|---|
-| 1 | ✅ Implemented | Detect raised hand → grant Multi-Pin |
-| 2 | 🔧 Scaffold | Camera check → chat warning |
-| 3 | 🔧 Scaffold | Chat spam detection → moderation hooks |
-
----
-
-## Known Limitations
-
-- **Undocumented WebSocket protocol** — Zoom's frame format may change without
-  notice.  The DOM fallback is the reliability safety net.
-- **SPA navigation** — If Zoom navigates between routes without a full page
-  reload, the registry is preserved but WebSocket connections may be replaced.
-  The interceptor handles new `WebSocket` instances automatically.
-- **CSS selector drift** — Zoom's React/Vue component class names are often
-  hashed and may change with updates.  Maintaining `zoom-dom-selectors.json`
-  after Zoom UI releases is required for continued operation.
-- **Menu timing** — Zoom's dropdown animations may cause race conditions.
-  `ACTION_DELAY_MS` and `MAX_MENU_RETRIES` mitigate this but may need tuning.
+- The script runs entirely in the browser under the user's existing Zoom session.
+- No credentials are stored or transmitted.
+- No external resources are loaded.
+- The debug panel uses `innerHTML` with string interpolation for internal
+  status messages; values are numeric counters or strings taken from the Zoom
+  DOM (for example, participant identifiers derived from display names).
+- DOM events dispatched (`mouseover`, `keydown`) are standard synthetic events
+  and do not exfiltrate data.
 
 ---
 
-## Configuration
+## Files
 
-All tuneable values are at the top of the script:
-
-| Constant | Default | Purpose |
-|---|---|---|
-| `DEBUG_MODE` | `false` | Enable verbose console logging |
-| `POLL_INTERVAL_MS` | `2000` | DOM fallback polling interval |
-| `ACTION_DELAY_MS` | `500` | Delay between UI interaction steps |
-| `MAX_MENU_RETRIES` | `3` | Max retries for opening participant menu |
-
----
-
-## Deployment
-
-1. Install the [Tampermonkey](https://www.tampermonkey.net/) browser extension.
-2. Create a new script and paste the contents of `scripts/zoom-host-tools.user.js`.
-3. Save the script.
-4. Join a Zoom meeting via the web client (`https://*.zoom.us/wc/…`).
-5. Open the browser console (F12) to see `[ZoomHostTools]` log output.
+| File | Purpose |
+|------|---------|
+| `scripts/zoom-host-tools.user.js` | Main Tampermonkey userscript |
+| `selectors/zoom-dom-selectors.json` | Selector map and fallback notes |
+| `docs/automation-design.md` | This file — architecture and assumptions |
+| `docs/testing-checklist.md` | Manual test plan |
