@@ -1,5 +1,5 @@
 {
-  "_comment": "Zoom Web DOM selectors used by the host automation userscript. Zoom may update its DOM structure at any time. When selectors stop working, update the values here — no changes to the main script are needed.",
+  "_comment": "Zoom Web DOM selectors used by the host automation userscript. Zoom may update its DOM structure at any time. When selectors stop working, update the values here AND update the matching entry in the embedded SELECTORS object in scripts/zoom-host-tools.user.js — both must be kept in sync manually since the userscript reads only the embedded object at runtime.",
   "_instructions": "Each key maps to a CSS selector string. The script will attempt the primary selector first; if it finds no matching element it falls back to the 'fallback' value. Set 'fallback' to null when no alternative is known.",
 
   "participantList": {
@@ -36,6 +36,12 @@
     "primary": "[aria-label='Allow to Multi-Pin']",
     "fallback": "[role='menuitem']",
     "_note": "Menu item inside the participant context menu that grants Multi-Pin permission. When the fallback is used, the script MUST additionally validate the element's text content contains 'Multi-Pin' because the fallback selector matches all menu items."
+  },
+
+  "menuItem": {
+    "primary": "[role='menuitem']",
+    "fallback": ".menu-item",
+    "_note": "Generic menu item element used for text-content searches when a more specific aria-label selector fails. Only used as a search scope — always validate text content after resolving."
   },
 
   "chatSender": {

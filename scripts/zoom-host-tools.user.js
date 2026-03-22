@@ -16,7 +16,9 @@
     // ─────────────────────────────────────────────────────────────────────────
 
     const DEBUG_MODE = true;
-    const SCAN_INTERVAL = 2000; // milliseconds between participant scans
+    const SCAN_INTERVAL = 2000;       // milliseconds between participant poll scans
+    const SPAM_COOLDOWN_MS = 10000;   // minimum ms between spam logs for the same sender
+    const LIST_RETRY_INTERVAL = 2000; // ms between retries waiting for participant list container
 
     // Spam patterns detected by the chat monitor
     const SPAM_PATTERNS = [
@@ -42,7 +44,8 @@
         raisedHandIcon:       { primary: '.participants-item__raised-hand-icon',  fallback: "[aria-label='Raise Hand'][class*='active']" },
         participantMenuButton:{ primary: '.participants-item__more-btn',          fallback: "[aria-label='More options for participant']" },
         multipinMenuOption:   { primary: "[aria-label='Allow to Multi-Pin']",     fallback: '[role="menuitem"]' },
-        chatSender:           { primary: '.chat-message__sender',                  fallback: '.chat-list__item-sender' },
+        menuItem:             { primary: '[role="menuitem"]',                     fallback: '.menu-item' },
+        chatSender:           { primary: '.chat-message__sender',                 fallback: '.chat-list__item-sender' },
         cameraStatusIcon:     { primary: '.participants-item__camera-icon--off',  fallback: "[aria-label='Video off']" },
         chatContainer:        { primary: '.chat-list__chat-virtualized',          fallback: '.chat-message-list' },
         chatMessage:          { primary: '.chat-message__text',                   fallback: '.chat-list__item-content' },
@@ -54,16 +57,25 @@
     // ─────────────────────────────────────────────────────────────────────────
 
     // Tracks participants that have already been processed.
-    // Keyed by display name; note that if two participants share an identical
-    // display name only the first will be processed. Zoom's DOM does not expose
-    // a stable unique ID in all views, so name is used as the best available key.
+    // Keyed by a stable participant key (derived from DOM data-* attributes when
+    // available, otherwise the display name). Note that if two participants share
+    // an identical display name AND no stable DOM attribute is present, only the
+    // first will be processed. Zoom's DOM does not reliably expose a unique ID in
+    // all views, so this is the best available key.
     const processedParticipants = new Set();
 
+    // Guards against overlapping scanParticipants() runs triggered by both the
+    // polling setTimeout and the MutationObserver.
+    let isScanning = false;
+
     const stats = {
-        scanned:  0,
-        hands:    0,
-        grants:   0,
-        lastAction: 'None',
+        scanned:          0,
+        hands:            0,
+        grants:           0,
+        selectorFallbacks:0,
+        lastParticipant:  'None',
+        lastGrantResult:  'None',
+        lastAction:       'None',
     };
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -88,7 +100,12 @@
         const el = root.querySelector(config.primary);
         if (el) return el;
         if (config.fallback) {
-            return root.querySelector(config.fallback) || null;
+            const fallbackEl = root.querySelector(config.fallback) || null;
+            if (fallbackEl) {
+                stats.selectorFallbacks++;
+                updateDebugPanel('selectorFallbacks', stats.selectorFallbacks);
+            }
+            return fallbackEl;
         }
         return null;
     }
@@ -132,41 +149,83 @@
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // MODULE 1b — PARTICIPANT IDENTITY
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Derives a stable key for a participant row. Checks common Zoom data-*
+     * attributes first so that participants who share a display name are still
+     * tracked independently. Falls back to the visible display name when no
+     * attribute is available.
+     *
+     * @param {Element} row      - Participant row element.
+     * @param {string}  nameText - Visible display name (used as last-resort key).
+     * @returns {string}
+     */
+    function getParticipantKey(row, nameText) {
+        const stableId =
+            row.dataset.uid ||
+            row.dataset.userid ||
+            row.dataset.participantId ||
+            row.dataset.id;
+        return stableId ? stableId : nameText;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // MODULE 2 — MULTI-PIN GRANT
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Checks whether a participant already has Multi-Pin by inspecting their
-     * context menu. Opens the menu, looks for the "Allow to Multi-Pin" option,
-     * and closes the menu immediately after checking.
+     * Possible outcomes of a Multi-Pin status check.
+     * @enum {string}
+     */
+    const MULTIPIN = {
+        NEEDS_GRANT:     'needs_grant',     // "Allow to Multi-Pin" visible → grant it
+        ALREADY_GRANTED: 'already_granted', // menu opened but option absent → already active
+        ERROR:           'error',           // could not open/inspect menu → skip this cycle
+    };
+
+    /**
+     * Opens a participant's context menu and checks for the "Allow to Multi-Pin"
+     * option, then dismisses the menu. Returns a MULTIPIN enum value describing
+     * the outcome so the caller can distinguish a genuine "already granted" state
+     * from a transient menu failure.
      *
      * @param {Element} row - Participant row element.
-     * @returns {Promise<boolean>} true if the option is present (i.e. not yet granted).
+     * @returns {Promise<string>} One of the MULTIPIN enum values.
      */
-    async function needsMultipin(row) {
+    async function checkMultipinStatus(row) {
         const menuButton = resolve('participantMenuButton', row);
-        if (!menuButton) return false;
+        if (!menuButton) {
+            log(`checkMultipinStatus: no menu button found — participant row may have been removed`);
+            return MULTIPIN.ERROR;
+        }
 
         menuButton.click();
-
-        // Allow a short moment for the menu to render
         await sleep(300);
 
-        const option = resolveMultipinOption();
-        const found = !!option;
+        // Verify the menu actually opened before inspecting its contents
+        const menuOpenedCheck = resolve('menuItem');
+        if (!menuOpenedCheck) {
+            log(`checkMultipinStatus: menu did not open (no menu items visible)`);
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            await sleep(200);
+            return MULTIPIN.ERROR;
+        }
 
-        // Dismiss the menu
+        const option = resolveMultipinOption();
+
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
         await sleep(200);
 
-        return found;
+        return option ? MULTIPIN.NEEDS_GRANT : MULTIPIN.ALREADY_GRANTED;
     }
 
     /**
      * Resolves the "Allow to Multi-Pin" menu option from the currently open
-     * participant context menu.  Tries the primary aria-label selector; if the
+     * participant context menu. Tries the primary aria-label selector first; if the
      * result does not contain the expected text (i.e. a generic fallback matched)
-     * it falls back to a full text-content search.
+     * it falls back to a full text-content search across all visible menu items.
      *
      * @returns {Element|null}
      */
@@ -179,13 +238,15 @@
     }
 
     /**
-     * Searches open menu items for one whose visible text matches a given string.
+     * Searches currently open menu items for one whose visible text matches
+     * the given string. Uses the configured 'menuItem' selector so the search
+     * scope can be updated centrally alongside other selectors.
      *
      * @param {string} text
      * @returns {Element|null}
      */
     function findMenuItemByText(text) {
-        const items = resolveAll('.menu-item, [role="menuitem"]') || [];
+        const items = resolveAll('menuItem');
         for (const item of items) {
             if (item.textContent && item.textContent.trim().toLowerCase().includes(text.toLowerCase())) {
                 return item;
@@ -199,40 +260,60 @@
      * Marks the participant as processed on success.
      * Retries once if the menu fails to open on the first attempt.
      *
-     * @param {Element} row  - Participant row element.
-     * @param {string}  name - Participant display name (for logging).
+     * @param {Element} row         - Participant row element.
+     * @param {string}  name        - Display name (for logging only).
+     * @param {string}  key         - Stable participant key used for dedup tracking.
      */
-    async function grantMultipin(row, name) {
+    async function grantMultipin(row, name, key) {
         for (let attempt = 1; attempt <= 2; attempt++) {
             const menuButton = resolve('participantMenuButton', row);
             if (!menuButton) {
-                log(`grantMultipin: no menu button found for "${name}" (attempt ${attempt})`);
+                const reason = 'menu button not found — participant row may have been removed from DOM';
+                log(`grantMultipin attempt ${attempt}: ${reason} for "${name}"`);
+                stats.lastGrantResult = `FAIL (${reason})`;
+                updateDebugPanel('lastGrantResult', stats.lastGrantResult);
                 break;
             }
 
             menuButton.click();
             await sleep(400);
 
-            const option = resolveMultipinOption();
+            const menuOpenedCheck = resolve('menuItem');
+            if (!menuOpenedCheck) {
+                const reason = 'menu did not open (no menu items visible after click)';
+                log(`grantMultipin attempt ${attempt}: ${reason} for "${name}"`);
+                stats.lastGrantResult = `FAIL (${reason})`;
+                updateDebugPanel('lastGrantResult', stats.lastGrantResult);
+                document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+                await sleep(300);
+                continue;
+            }
 
+            const option = resolveMultipinOption();
             if (option) {
                 option.click();
-                processedParticipants.add(name);
+                processedParticipants.add(key);
                 stats.grants++;
+                stats.lastParticipant = name;
+                stats.lastGrantResult = 'SUCCESS';
                 stats.lastAction = `Granted Multi-Pin to ${name}`;
-                log(`✅ Granted Multi-Pin to "${name}"`);
+                log(`✅ Granted Multi-Pin to "${name}" (key: ${key})`);
                 updateDebugPanel('grants', stats.grants);
+                updateDebugPanel('lastParticipant', stats.lastParticipant);
+                updateDebugPanel('lastGrantResult', stats.lastGrantResult);
                 updateDebugPanel('lastAction', stats.lastAction);
                 return;
             }
 
-            // Menu opened but option not found — dismiss and retry
-            log(`grantMultipin: option not found for "${name}", attempt ${attempt}`);
+            const reason = `"Allow to Multi-Pin" option not found in open menu`;
+            log(`grantMultipin attempt ${attempt}: ${reason} for "${name}"`);
+            stats.lastGrantResult = `FAIL (${reason})`;
+            updateDebugPanel('lastGrantResult', stats.lastGrantResult);
             document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
             await sleep(300);
         }
 
-        log(`grantMultipin: failed to grant Multi-Pin to "${name}" after retries`);
+        log(`grantMultipin: all attempts exhausted for "${name}" — will retry on next scan`);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -241,7 +322,15 @@
 
     /**
      * Inspects the camera status icon for a participant row.
-     * If the camera is off, a reminder message should be sent via chat.
+     *
+     * Planned trigger conditions (TODO — not yet wired to chat):
+     *   1. Participant has raised their hand.
+     *   2. Multi-Pin has just been granted (or was already active).
+     *   3. Camera is detected as off.
+     *   → Send reminder: "Please turn your camera on to use Multi-Pin."
+     *
+     * The reminder should only be sent once per participant per session
+     * (track in a separate Set, similar to processedParticipants).
      *
      * @param {Element} row  - Participant row element.
      * @param {string}  name - Participant display name.
@@ -250,9 +339,9 @@
         const cameraOff = resolve('cameraStatusIcon', row);
         if (cameraOff) {
             log(`📷 Camera is OFF for "${name}"`);
-            // TODO: Send chat message:
-            //   "Please turn your camera on to use Multi-Pin."
-            // Use sendChatMessage() once implemented.
+            // TODO: implement sendChatMessage(text) using the 'chatInput' selector,
+            // then call: sendChatMessage(`${name}, please turn your camera on to use Multi-Pin.`)
+            // Wrap in a cameraReminderSent Set guard to avoid repeated messages.
         }
     }
 
@@ -261,14 +350,16 @@
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Main scanning loop. Called on every interval tick.
+     * Main scanning function. Called both by the self-scheduling poll and by
+     * the MutationObserver when the participant list changes.
      *
      * For each participant row:
      *   1. Reads the participant's display name.
-     *   2. Skips participants that have already been processed.
-     *   3. Detects a raised-hand icon.
-     *   4. Checks whether Multi-Pin is already granted.
-     *   5. Grants Multi-Pin if needed.
+     *   2. Derives a stable participant key (data attribute or name).
+     *   3. Skips participants that have already been processed.
+     *   4. Detects a raised-hand icon.
+     *   5. Checks Multi-Pin status (tri-state: needs_grant / already_granted / error).
+     *   6. Grants Multi-Pin if needed; marks processed only on confirmed outcomes.
      */
     async function scanParticipants() {
         const rows = resolveAll('participantRow');
@@ -281,28 +372,37 @@
             try {
                 const nameEl = resolve('participantName', row);
                 const name = nameEl ? nameEl.textContent.trim() : null;
-
                 if (!name) continue;
-                if (processedParticipants.has(name)) continue;
+
+                const key = getParticipantKey(row, name);
+                if (processedParticipants.has(key)) continue;
 
                 const raisedHand = resolve('raisedHandIcon', row);
                 if (!raisedHand) continue;
 
                 stats.hands++;
-                log(`✋ Raised hand detected: "${name}"`);
+                log(`✋ Raised hand detected: "${name}" (key: ${key})`);
                 updateDebugPanel('hands', stats.hands);
+                updateDebugPanel('lastParticipant', name);
 
-                // Camera check (scaffold — does not block the flow)
+                // Camera check (scaffold — does not block the Multi-Pin flow)
                 checkCameraStatus(row, name);
 
-                // Only grant if the option still exists in the menu
-                const shouldGrant = await needsMultipin(row);
-                if (shouldGrant) {
-                    await grantMultipin(row, name);
+                const status = await checkMultipinStatus(row);
+                if (status === MULTIPIN.NEEDS_GRANT) {
+                    await grantMultipin(row, name, key);
+                } else if (status === MULTIPIN.ALREADY_GRANTED) {
+                    // Confirmed Multi-Pin is active; mark processed so we stop scanning
+                    processedParticipants.add(key);
+                    stats.lastParticipant = name;
+                    stats.lastGrantResult = 'already granted';
+                    log(`ℹ️  Multi-Pin already granted for "${name}" (key: ${key}); skipping`);
+                    updateDebugPanel('lastParticipant', name);
+                    updateDebugPanel('lastGrantResult', stats.lastGrantResult);
                 } else {
-                    // Multi-Pin already granted; mark as processed to avoid re-scanning
-                    processedParticipants.add(name);
-                    log(`ℹ️  Multi-Pin already granted for "${name}"; skipping`);
+                    // status === MULTIPIN.ERROR: could not inspect menu this cycle
+                    // Do NOT mark as processed — will retry on next scan
+                    log(`⚠️  Could not confirm Multi-Pin status for "${name}"; will retry on next scan`);
                 }
             } catch (err) {
                 log(`scanParticipants error: ${err.message}`);
@@ -314,60 +414,88 @@
     // MODULE 5 — CHAT MONITOR SCAFFOLD
     // ─────────────────────────────────────────────────────────────────────────
 
+    // Rate-limit spam log messages: track last log timestamp per sender.
+    // A sender can trigger at most one spam log every SPAM_COOLDOWN_MS (see CONFIGURATION).
+    const spamCooldown = new Map(); // sender string → timestamp
+
     /**
      * Observes chat messages for potential spam content.
      * Currently only logs detections; hook for moderation actions is prepared.
+     *
+     * Reconnects automatically if the container element is removed from the DOM
+     * and re-added (e.g., when Zoom re-renders the chat panel).
      */
     function monitorChat() {
-        const container = resolve('chatContainer');
+        let container = resolve('chatContainer');
         if (!container) {
             log('monitorChat: chat container not found; will retry on next interval');
             return;
         }
 
-        const observer = new MutationObserver((mutations) => {
-            for (const mutation of mutations) {
-                for (const node of mutation.addedNodes) {
-                    if (node.nodeType !== Node.ELEMENT_NODE) continue;
+        let chatObserver = null;
 
-                    // Use the selector resolver for consistency
-                    const msgEl = resolve('chatMessage', node) || (
-                        node.matches && (
-                            node.matches(SELECTORS.chatMessage.primary) ||
-                            node.matches(SELECTORS.chatMessage.fallback)
-                        ) ? node : null
-                    );
+        function attachObserver(target) {
+            if (chatObserver) {
+                chatObserver.disconnect();
+            }
+            chatObserver = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    for (const node of mutation.addedNodes) {
+                        if (node.nodeType !== Node.ELEMENT_NODE) continue;
 
-                    if (!msgEl) continue;
+                        const msgEl = resolve('chatMessage', node) || (
+                            node.matches &&
+                            (node.matches(SELECTORS.chatMessage.primary) ||
+                             node.matches(SELECTORS.chatMessage.fallback))
+                                ? node
+                                : null
+                        );
 
-                    const text = msgEl.textContent || '';
-                    const lowerText = text.toLowerCase();
-                    const spamDetected = SPAM_PATTERNS.some(p => lowerText.includes(p));
+                        if (!msgEl) continue;
 
-                    if (spamDetected) {
-                        // Extract sender name using the configured selector.
-                        // Resolve from a shared parent container so we can find the sender
-                        // even when the mutation node is only the message text element.
-                        const messageRoot =
-                            (msgEl && msgEl.parentElement) ||
-                            (node && node.parentElement) ||
-                            msgEl;
-                        const senderEl = resolve('chatSender', messageRoot);
-                        const sender = senderEl ? senderEl.textContent.trim() : 'unknown';
+                        const text = msgEl.textContent || '';
+                        const lowerText = text.toLowerCase();
+                        const spamDetected = SPAM_PATTERNS.some(p => lowerText.includes(p));
 
-                        log(`⚠️  Possible spam detected | user: "${sender}" | message: "${text.trim()}"`);
+                        if (spamDetected) {
+                            const messageRoot =
+                                (msgEl.parentElement) ||
+                                (node.parentElement) ||
+                                msgEl;
+                            const senderEl = resolve('chatSender', messageRoot);
+                            const sender = senderEl ? senderEl.textContent.trim() : 'unknown';
 
-                        // TODO: hook for moderation actions, e.g.:
-                        //   - mute the participant
-                        //   - remove the message
-                        //   - flag to host dashboard
+                            // Rate-limit: skip if this sender was logged recently
+                            const lastLog = spamCooldown.get(sender) || 0;
+                            if (Date.now() - lastLog < SPAM_COOLDOWN_MS) continue;
+                            spamCooldown.set(sender, Date.now());
+
+                            log(`⚠️  Possible spam detected | user: "${sender}" | message: "${text.trim()}"`);
+
+                            // TODO: hook for moderation actions, e.g.:
+                            //   - mute the participant
+                            //   - remove the message
+                            //   - flag to host dashboard
+                        }
                     }
                 }
+            });
+            chatObserver.observe(target, { childList: true, subtree: true });
+            log('monitorChat: observer attached to chat container');
+        }
+
+        attachObserver(container);
+
+        // Watch for the container being removed and re-added (Zoom SPA re-renders).
+        const reconnectObserver = new MutationObserver(() => {
+            const current = resolve('chatContainer');
+            if (current && current !== container) {
+                log('monitorChat: chat container replaced — reconnecting observer');
+                container = current;
+                attachObserver(container);
             }
         });
-
-        observer.observe(container, { childList: true, subtree: true });
-        log('monitorChat: observer attached to chat container');
+        reconnectObserver.observe(document.body, { childList: true, subtree: true });
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -387,7 +515,7 @@
             'font:12px/1.5 monospace',
             'padding:10px 14px',
             'border-radius:6px',
-            'min-width:220px',
+            'min-width:240px',
             'pointer-events:none',
         ].join(';');
 
@@ -396,6 +524,9 @@
             <div>Scanned: <span data-key="scanned">0</span></div>
             <div>Raised hands: <span data-key="hands">0</span></div>
             <div>Multi-Pin grants: <span data-key="grants">0</span></div>
+            <div>Selector fallbacks: <span data-key="selectorFallbacks">0</span></div>
+            <div>Last participant: <span data-key="lastParticipant">None</span></div>
+            <div>Last grant result: <span data-key="lastGrantResult">None</span></div>
             <div>Last action: <span data-key="lastAction">None</span></div>
         `;
 
@@ -412,6 +543,34 @@
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // MODULE 7 — PARTICIPANT LIST OBSERVER (polling + observer hybrid)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Attaches a MutationObserver to the participant list container. When rows
+     * are added (someone joins or raises hand), an immediate scan is triggered
+     * instead of waiting for the next poll interval. This makes hand-raise
+     * detection faster without replacing the reliable polling fallback.
+     *
+     * Uses the shared `isScanning` flag to prevent overlap with the poll loop.
+     */
+    function watchParticipantList() {
+        const container = resolve('participantList');
+        if (!container) return;
+
+        const observer = new MutationObserver(() => {
+            if (isScanning) return;
+            isScanning = true;
+            scanParticipants()
+                .catch(err => log(`watchParticipantList scan error: ${err.message}`))
+                .finally(() => { isScanning = false; });
+        });
+
+        observer.observe(container, { childList: true, subtree: true });
+        log('Participant list observer attached');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // ENTRY POINT
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -422,18 +581,38 @@
             createDebugPanel();
         }
 
-        // Start the polling loop without overlapping runs
+        // Self-scheduling poll — never overlaps with itself.
+        // Also guarded by isScanning so it doesn't overlap with observer-triggered scans.
         const pollParticipants = async () => {
-            try {
-                await scanParticipants();
-            } catch (err) {
-                log(`Polling error: ${err.message}`);
-            } finally {
-                setTimeout(pollParticipants, SCAN_INTERVAL);
+            if (!isScanning) {
+                isScanning = true;
+                try {
+                    await scanParticipants();
+                } catch (err) {
+                    log(`Polling error: ${err.message}`);
+                } finally {
+                    isScanning = false;
+                }
             }
+            setTimeout(pollParticipants, SCAN_INTERVAL);
         };
-        // Schedule the first scan
         setTimeout(pollParticipants, SCAN_INTERVAL);
+
+        // Attach MutationObserver on participant list for faster detection.
+        // Keep retrying until the list container is found (meeting may still be loading).
+        let listRetryCount = 0;
+        const LIST_RETRY_MAX = 15;
+        const listRetry = setInterval(() => {
+            listRetryCount++;
+            const container = resolve('participantList');
+            if (container) {
+                watchParticipantList();
+                clearInterval(listRetry);
+            } else if (listRetryCount >= LIST_RETRY_MAX) {
+                log('watchParticipantList: participant list not found after max retries; relying on polling only');
+                clearInterval(listRetry);
+            }
+        }, LIST_RETRY_INTERVAL);
 
         // Start chat monitoring; Zoom may render the chat panel lazily,
         // so keep retrying until the container is found (up to ~60 seconds).
@@ -451,7 +630,7 @@
             }
         }, 3000);
 
-        log(`Zoom Host Automation active (interval: ${SCAN_INTERVAL}ms)`);
+        log(`Zoom Host Automation active (poll interval: ${SCAN_INTERVAL}ms)`);
     }
 
     // Wait for the Zoom meeting UI to finish loading before starting
