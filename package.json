@@ -1,0 +1,18 @@
+{
+  "name": "nebulosa-host-tools",
+  "version": "1.0.0",
+  "description": "Build tooling for the Nebulosa Zoom host-tool userscripts",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-userscript.js",
+    "build:doppler": "doppler run -- node scripts/build-userscript.js",
+    "build:dev": "NODE_ENV=development node scripts/build-userscript.js",
+    "build:prod": "NODE_ENV=production node scripts/build-userscript.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.5"
+  }
+}

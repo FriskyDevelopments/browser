@@ -1,0 +1,69 @@
+name: doppler-build
+
+# Builds compiled userscripts by injecting secrets from Doppler, then uploads
+# the dist/ artefacts.  Runs on every push to main and on pull requests.
+#
+# Prerequisites (repository secrets / variables):
+#   DOPPLER_SERVICE_TOKEN   — a Doppler service token scoped to the "nebulosa"
+#                             project.  Create one at:
+#                             https://dashboard.doppler.com/workplace/projects/nebulosa/configs
+#
+# The built artefacts (dist/*.user.js) are uploaded so that downstream jobs,
+# integration tests, or manual downloads can consume the compiled scripts.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/**'
+      - 'selectors/**'
+      - 'config/**'
+      - 'package.json'
+      - 'doppler.yaml'
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'selectors/**'
+      - 'config/**'
+      - 'package.json'
+      - 'doppler.yaml'
+  workflow_dispatch:
+
+jobs:
+  build-userscripts:
+    name: Build compiled userscripts via Doppler
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install Node dependencies (dotenv, etc.)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Install the Doppler CLI and authenticate with the service token.
+      # The token is scoped to a single Doppler config (e.g. production).
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@v3
+
+      - name: Build userscripts with Doppler secrets
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_SERVICE_TOKEN }}
+        run: doppler run --token "$DOPPLER_TOKEN" -- npm run build
+
+      - name: Upload compiled userscripts
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-userscripts
+          path: dist/
+          retention-days: 30

@@ -20,16 +20,12 @@
   // CONFIGURATION
   // ─────────────────────────────────────────────────────────────────────────────
 
-  const DEBUG_MODE = false;
-
-  // Polling interval for DOM fallback (ms)
-  const POLL_INTERVAL_MS = 2000;
-
-  // How long to wait (ms) between steps when driving the participant menu
-  const ACTION_DELAY_MS = 500;
-
-  // How many times to retry opening a participant menu before giving up
-  const MAX_MENU_RETRIES = 3;
+  // @@DOPPLER_CONFIG_START — values below are overwritten by scripts/build-userscript.js
+  const DEBUG_MODE         = false;
+  const POLL_INTERVAL_MS   = 2000;
+  const ACTION_DELAY_MS    = 500;
+  const MAX_MENU_RETRIES   = 3;
+  // @@DOPPLER_CONFIG_END
 
   // Selectors are loaded from the companion JSON file declared as a @resource.
   // This makes selectors/zoom-dom-selectors.json the single source of truth and
