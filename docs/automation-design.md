@@ -46,7 +46,29 @@ requires no external infrastructure.
 
 ---
 
-## Components
+## Secret Management
+
+Script configuration (poll intervals, feature flags, spam-word lists) is
+managed through [Doppler](https://doppler.com) and injected at **build time**
+by `scripts/build-userscript.js`.
+
+```
+Doppler dashboard
+    │
+    │  doppler run -- npm run build
+    ▼
+scripts/build-userscript.js
+    │  reads ZOOM_HOST_* env vars
+    │  replaces @@DOPPLER_CONFIG_START…END block
+    ▼
+dist/zoom-host-tools.user.js   ← install this in Tampermonkey
+dist/zoom-host-automation.user.js
+```
+
+See [`docs/doppler-setup.md`](doppler-setup.md) for full setup instructions.
+
+---
+
 
 ### 1. WebSocket Interceptor (Primary Detection)
 
