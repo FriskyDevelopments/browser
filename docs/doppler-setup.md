@@ -161,7 +161,7 @@ dist/
 
 The workflow [`.github/workflows/doppler-build.yml`](../.github/workflows/doppler-build.yml)
 automatically builds compiled userscripts on every push to `main` and on pull
-requests that touch `scripts/`, `selectors/`, `config/`, or `package.json`.
+requests that touch `scripts/`, `selectors/`, `config/`, `doppler.yaml`, or `package.json`.
 
 ### Required repository secret
 

@@ -14,7 +14,7 @@
 # To install the Doppler CLI:
 #   macOS:   brew install dopplerhq/cli/doppler
 #   Linux:   https://docs.doppler.com/docs/install-cli
-#   Docker:  see Dockerfile.doppler (optional wrapper)
+#   Docker:  https://docs.doppler.com/docs/docker
 #
 # Quick start:
 #   doppler login
