@@ -1,5 +1,21 @@
 # Doppler project configuration for the Zoom Host Automation userscript.
 # Docs: https://docs.doppler.com/docs/doppler-yaml
+#
+# Secrets managed in this project:
+#
+#   ZOOM_DEBUG_MODE            — boolean; enables debug panel and console logging
+#   ZOOM_SCAN_INTERVAL         — number ms; participant poll interval
+#   ZOOM_SPAM_COOLDOWN_MS      — number ms; minimum interval between spam logs per sender
+#   ZOOM_LIST_RETRY_INTERVAL   — number ms; retry interval for participant list container
+#   ZOOM_SPAM_PATTERNS         — comma-separated URL patterns to flag as spam
+#
+#   GH_PAT                     — GitHub Personal Access Token with repo write access.
+#                                Required to write CLA signatures to the remote
+#                                organisation repository (lightpanda-io/cla).
+#                                Grant: repo (full) or contents:write on the target repo.
+#                                In CI set DOPPLER_TOKEN and inject via: doppler run -- <cmd>
+#                                In Codespaces the token is forwarded from the host env
+#                                as GH_PAT (see .devcontainer/devcontainer.json).
 
 setup:
   project: zoom-host-automation

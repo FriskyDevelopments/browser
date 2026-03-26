@@ -18,6 +18,13 @@
  *   ZOOM_SPAM_COOLDOWN_MS      number   ms                 (default: 10000)
  *   ZOOM_LIST_RETRY_INTERVAL   number   ms                 (default: 2000)
  *   ZOOM_SPAM_PATTERNS         string   comma-separated    (default: built-in list)
+ *
+ * Credentials (injected by Doppler; not embedded in the built output):
+ *   GH_PAT                     string   GitHub Personal Access Token with repo write
+ *                                       access on the remote signatures repository
+ *                                       (lightpanda-io/cla). Required for CLA signing.
+ *                                       Validated at build time so CI fails fast if
+ *                                       missing; not written into dist/.
  */
 
 'use strict';
@@ -68,6 +75,22 @@ for (const [name, value] of [
         console.error(`build-userscript: invalid value for ${name}: "${value}" (must be a positive integer)`);
         process.exit(1);
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Validate credentials (GH_PAT)
+//
+// GH_PAT must be present so CI fails fast rather than silently producing a
+// build that cannot write CLA signatures.  It is intentionally NOT embedded
+// in the output script — it is only validated here at build time.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const GH_PAT = process.env.GH_PAT;
+if (!GH_PAT || GH_PAT.trim() === '') {
+    console.error('build-userscript: GH_PAT environment variable is not set.');
+    console.error('  Set it via Doppler (doppler secrets set GH_PAT <token>) or export it manually.');
+    console.error('  The token needs repo write access on the remote signatures repository (lightpanda-io/cla).');
+    process.exit(1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -138,4 +161,6 @@ console.log(`    SCAN_INTERVAL       = ${SCAN_INTERVAL} ms`);
 console.log(`    SPAM_COOLDOWN_MS    = ${SPAM_COOLDOWN_MS} ms`);
 console.log(`    LIST_RETRY_INTERVAL = ${LIST_RETRY_INTERVAL} ms`);
 console.log(`    SPAM_PATTERNS       = [${SPAM_PATTERNS.join(', ')}]`);
+console.log(`  credentials :`);
+console.log(`    GH_PAT              = ******** (set)`);
 console.log(`\nInstall dist/zoom-host-tools.user.js in TamperMonkey to use the built script.`);

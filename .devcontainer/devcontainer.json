@@ -16,7 +16,8 @@
     }
   },
   "remoteEnv": {
-    "DOPPLER_TOKEN": "${localEnv:DOPPLER_TOKEN}"
+    "DOPPLER_TOKEN": "${localEnv:DOPPLER_TOKEN}",
+    "GH_PAT": "${localEnv:GH_PAT}"
   },
   "features": {}
 }

@@ -198,6 +198,7 @@ Add the following secrets to your `zoom-host-automation` Doppler project:
 | `ZOOM_SPAM_COOLDOWN_MS`  | number  | `10000`      | Minimum ms between spam log entries for the same sender |
 | `ZOOM_LIST_RETRY_INTERVAL` | number | `2000`      | ms between retries waiting for the participant list container |
 | `ZOOM_SPAM_PATTERNS`     | string  | (built-in)   | Comma-separated list of spam URL patterns to detect |
+| `GH_PAT`                 | string  | —            | GitHub Personal Access Token with repo write access. Required to write CLA signatures to the remote organisation repository (`lightpanda-io/cla`). Grant: `repo` (full) or `contents:write` on the target repo. |
 
 ### How the build works
 
@@ -237,15 +238,21 @@ A pre-configured devcontainer (`.devcontainer/devcontainer.json`) is included so
    doppler login
    doppler setup   # select project: zoom-host-automation, config: dev
    ```
-4. Build the userscript with your Doppler secrets:
+4. Add the GitHub Personal Access Token to Doppler (needed to write CLA signatures):
+   ```bash
+   doppler secrets set GH_PAT <your-github-pat>
+   # PAT requires repo write access on the lightpanda-io/cla repository
+   ```
+5. Build the userscript with your Doppler secrets:
    ```bash
    doppler run -- npm run build
    ```
-5. Install `dist/zoom-host-tools.user.js` into TamperMonkey.
+6. Install `dist/zoom-host-tools.user.js` into TamperMonkey.
 
 ### Using a Doppler service token (CI / automated environments)
 
-Set the `DOPPLER_TOKEN` environment variable in your Codespace or CI environment:
+Set the `DOPPLER_TOKEN` environment variable in your Codespace or CI environment.  
+`GH_PAT` (and all other secrets) is then injected automatically by `doppler run`:
 ```bash
 export DOPPLER_TOKEN=dp.st.dev.xxxx
 doppler run -- npm run build
