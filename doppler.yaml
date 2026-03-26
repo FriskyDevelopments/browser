@@ -1,0 +1,6 @@
+# Doppler project configuration for the Zoom Host Automation userscript.
+# Docs: https://docs.doppler.com/docs/doppler-yaml
+
+setup:
+  project: zoom-host-automation
+  config: dev

@@ -1,0 +1,13 @@
+{
+  "name": "zoom-host-automation",
+  "version": "1.0.0",
+  "description": "Build tooling for the Zoom Web host automation userscript",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-userscript.js",
+    "build:doppler": "doppler run -- node scripts/build-userscript.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

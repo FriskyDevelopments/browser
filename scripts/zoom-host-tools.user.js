@@ -13,8 +13,15 @@
 
     // ─────────────────────────────────────────────────────────────────────────
     // CONFIGURATION
+    //
+    // Values in this block are replaced at build time by scripts/build-userscript.js
+    // using secrets fetched from Doppler (see doppler.yaml).
+    // To build a distributable copy with your own settings, run:
+    //   doppler run -- npm run build
+    // or set the environment variables manually and run: npm run build
     // ─────────────────────────────────────────────────────────────────────────
 
+    // @@DOPPLER_CONFIG_START
     const DEBUG_MODE = true;
     const SCAN_INTERVAL = 2000;       // milliseconds between participant poll scans
     const SPAM_COOLDOWN_MS = 10000;   // minimum ms between spam logs for the same sender
@@ -28,6 +35,7 @@
         'bit.ly',
         'discord.gg',
     ];
+    // @@DOPPLER_CONFIG_END
 
     // ─────────────────────────────────────────────────────────────────────────
     // EMBEDDED SELECTOR CONFIGURATION

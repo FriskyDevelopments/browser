@@ -1,0 +1,141 @@
+#!/usr/bin/env node
+/**
+ * Build script for zoom-host-tools.user.js
+ *
+ * Reads the source userscript (scripts/zoom-host-tools.user.js), replaces the
+ * configuration block delimited by @@DOPPLER_CONFIG_START / @@DOPPLER_CONFIG_END
+ * with values injected from environment variables (populated by Doppler at build
+ * time), and writes the distributable copy to dist/zoom-host-tools.user.js.
+ *
+ * Usage:
+ *   doppler run -- npm run build      # inject secrets from Doppler
+ *   npm run build                     # use environment variables already set
+ *   node scripts/build-userscript.js  # same as above
+ *
+ * Environment variables consumed (all optional — defaults mirror the source):
+ *   ZOOM_DEBUG_MODE            boolean  "true" / "false"   (default: true)
+ *   ZOOM_SCAN_INTERVAL         number   ms                 (default: 2000)
+ *   ZOOM_SPAM_COOLDOWN_MS      number   ms                 (default: 10000)
+ *   ZOOM_LIST_RETRY_INTERVAL   number   ms                 (default: 2000)
+ *   ZOOM_SPAM_PATTERNS         string   comma-separated    (default: built-in list)
+ */
+
+'use strict';
+
+const fs   = require('fs');
+const path = require('path');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Paths
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ROOT       = path.resolve(__dirname, '..');
+const SRC        = path.join(ROOT, 'scripts', 'zoom-host-tools.user.js');
+const DIST_DIR   = path.join(ROOT, 'dist');
+const DIST_FILE  = path.join(DIST_DIR, 'zoom-host-tools.user.js');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Read configuration from environment (Doppler-injected or manually set)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DEBUG_MODE          = process.env.ZOOM_DEBUG_MODE          !== undefined
+    ? process.env.ZOOM_DEBUG_MODE.trim().toLowerCase() === 'true'
+    : true;
+
+const SCAN_INTERVAL       = process.env.ZOOM_SCAN_INTERVAL        !== undefined
+    ? parseInt(process.env.ZOOM_SCAN_INTERVAL, 10)
+    : 2000;
+
+const SPAM_COOLDOWN_MS    = process.env.ZOOM_SPAM_COOLDOWN_MS     !== undefined
+    ? parseInt(process.env.ZOOM_SPAM_COOLDOWN_MS, 10)
+    : 10000;
+
+const LIST_RETRY_INTERVAL = process.env.ZOOM_LIST_RETRY_INTERVAL  !== undefined
+    ? parseInt(process.env.ZOOM_LIST_RETRY_INTERVAL, 10)
+    : 2000;
+
+const SPAM_PATTERNS = process.env.ZOOM_SPAM_PATTERNS !== undefined
+    ? process.env.ZOOM_SPAM_PATTERNS.split(',').map(s => s.trim()).filter(Boolean)
+    : ['http://', 'https://', 't.me', 'bit.ly', 'discord.gg'];
+
+// Validate numeric values
+for (const [name, value] of [
+    ['ZOOM_SCAN_INTERVAL', SCAN_INTERVAL],
+    ['ZOOM_SPAM_COOLDOWN_MS', SPAM_COOLDOWN_MS],
+    ['ZOOM_LIST_RETRY_INTERVAL', LIST_RETRY_INTERVAL],
+]) {
+    if (!Number.isFinite(value) || value <= 0) {
+        console.error(`build-userscript: invalid value for ${name}: "${value}" (must be a positive integer)`);
+        process.exit(1);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Build the replacement config block
+// ─────────────────────────────────────────────────────────────────────────────
+
+const spamPatternsLiteral = SPAM_PATTERNS
+    .map(p => `        '${p.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`)
+    .join(',\n');
+
+const configBlock = `\
+    // @@DOPPLER_CONFIG_START
+    const DEBUG_MODE = ${DEBUG_MODE};
+    const SCAN_INTERVAL = ${SCAN_INTERVAL};       // milliseconds between participant poll scans
+    const SPAM_COOLDOWN_MS = ${SPAM_COOLDOWN_MS};   // minimum ms between spam logs for the same sender
+    const LIST_RETRY_INTERVAL = ${LIST_RETRY_INTERVAL}; // ms between retries waiting for participant list container
+
+    // Spam patterns detected by the chat monitor
+    const SPAM_PATTERNS = [
+${spamPatternsLiteral},
+    ];
+    // @@DOPPLER_CONFIG_END`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Replace the config block in the source
+// ─────────────────────────────────────────────────────────────────────────────
+
+const source = fs.readFileSync(SRC, 'utf8');
+
+const START_MARKER = '    // @@DOPPLER_CONFIG_START';
+const END_MARKER   = '    // @@DOPPLER_CONFIG_END';
+
+const startIdx = source.indexOf(START_MARKER);
+const endIdx   = source.indexOf(END_MARKER);
+
+if (startIdx === -1 || endIdx === -1) {
+    console.error('build-userscript: could not find @@DOPPLER_CONFIG_START / @@DOPPLER_CONFIG_END markers in source file.');
+    console.error('  Source file:', SRC);
+    process.exit(1);
+}
+
+if (startIdx >= endIdx) {
+    console.error('build-userscript: @@DOPPLER_CONFIG_START appears after @@DOPPLER_CONFIG_END — check source file.');
+    process.exit(1);
+}
+
+const output =
+    source.slice(0, startIdx) +
+    configBlock +
+    source.slice(endIdx + END_MARKER.length);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Write output
+// ─────────────────────────────────────────────────────────────────────────────
+
+if (!fs.existsSync(DIST_DIR)) {
+    fs.mkdirSync(DIST_DIR, { recursive: true });
+}
+
+fs.writeFileSync(DIST_FILE, output, 'utf8');
+
+console.log(`build-userscript: built successfully`);
+console.log(`  source : ${SRC}`);
+console.log(`  output : ${DIST_FILE}`);
+console.log(`  config :`);
+console.log(`    DEBUG_MODE          = ${DEBUG_MODE}`);
+console.log(`    SCAN_INTERVAL       = ${SCAN_INTERVAL} ms`);
+console.log(`    SPAM_COOLDOWN_MS    = ${SPAM_COOLDOWN_MS} ms`);
+console.log(`    LIST_RETRY_INTERVAL = ${LIST_RETRY_INTERVAL} ms`);
+console.log(`    SPAM_PATTERNS       = [${SPAM_PATTERNS.join(', ')}]`);
+console.log(`\nInstall dist/zoom-host-tools.user.js in TamperMonkey to use the built script.`);
