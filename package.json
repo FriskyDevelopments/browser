@@ -1,9 +1,10 @@
 {
   "name": "nebulosa-host-tools",
   "version": "1.0.0",
-  "description": "Build tooling for the Nebulosa Zoom host-tool userscripts",
+  "description": "HostPilot userscript — build tooling and unit tests",
   "private": true,
   "scripts": {
+    "test": "jest --no-coverage",
     "build": "node scripts/build-userscript.js",
     "build:doppler": "doppler run -- node scripts/build-userscript.js",
     "build:dev": "NODE_ENV=development node scripts/build-userscript.js",
@@ -13,6 +14,14 @@
     "node": ">=18"
   },
   "devDependencies": {
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
   }
 }
