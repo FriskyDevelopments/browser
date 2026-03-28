@@ -16,6 +16,7 @@
   // ---------------------------------------------------------------------------
   // Configuration — edit these values to tune behaviour
   // ---------------------------------------------------------------------------
+  // @@DOPPLER_CONFIG_START — values below are overwritten by scripts/build-userscript.js
   const CONFIG = {
     // How often (ms) to poll for raised hands and camera status
     pollIntervalMs: 2000,
@@ -46,6 +47,7 @@
       chatMod: true,      // Phase 3
     },
   };
+  // @@DOPPLER_CONFIG_END
 
   // ---------------------------------------------------------------------------
   // Stable DOM selector helpers

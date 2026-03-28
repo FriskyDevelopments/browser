@@ -83,7 +83,25 @@ Additional modules will expand automation capabilities over time.
 
 ---
 
-## 🚀 Project Status
+## 🔑 Secret Management (Doppler)
+
+All configuration values and secrets are managed through **[Doppler](https://doppler.com)**.
+
+This means sensitive settings (API keys, moderation word lists, feature flags)
+are never hard-coded in source files.  Instead, a build step injects them
+into the compiled userscripts at deploy time.
+
+```bash
+# Install Doppler CLI, then:
+doppler setup           # link to the "nebulosa" project
+doppler run -- npm run build   # compile scripts with secrets injected
+# Install from dist/ in Tampermonkey
+```
+
+See **[docs/doppler-setup.md](docs/doppler-setup.md)** for a complete setup guide.
+
+---
+
 
 Nebulosa is currently in **active development**.
 

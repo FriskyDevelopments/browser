@@ -1,0 +1,26 @@
+# Doppler project configuration for Nebulosa / Lightpanda Browser
+#
+# Documentation: https://docs.doppler.com/docs/doppler-yaml
+#
+# This file maps each Doppler environment to the corresponding secret config.
+# Run `doppler setup` in this directory to select a project and config, then
+# `doppler run -- <command>` to inject secrets into any process.
+#
+# Configs:
+#   dev        – local development (uses Doppler dev config)
+#   staging    – pre-production (uses Doppler staging config)
+#   production – live meetings (uses Doppler production config)
+#
+# To install the Doppler CLI:
+#   macOS:   brew install dopplerhq/cli/doppler
+#   Linux:   https://docs.doppler.com/docs/install-cli
+#   Docker:  https://docs.doppler.com/docs/docker
+#
+# Quick start:
+#   doppler login
+#   doppler setup          # select project "nebulosa" and the appropriate config
+#   doppler run -- node scripts/build-userscript.js
+
+setup:
+  project: nebulosa
+  config: dev

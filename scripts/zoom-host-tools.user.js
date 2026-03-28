@@ -16,7 +16,11 @@
   // ─────────────────────────────────────────────────────────────────────────────
   // CONFIG
   // Toggle DEBUG to see verbose console output in the browser console.
+  // Values between the @@DOPPLER_CONFIG_START / END sentinels are overwritten
+  // by scripts/build-userscript.js when running `doppler run -- npm run build`.
   // ─────────────────────────────────────────────────────────────────────────────
+
+  // @@DOPPLER_CONFIG_START — values below are overwritten by scripts/build-userscript.js
   const CONFIG = {
     DEBUG: true,               // Set false to silence non-critical logs
     SCAN_INTERVAL_MS: 2500,    // How often to scan for raised hands (ms)
@@ -31,6 +35,7 @@
     ],
     ZOOM_READY_TIMEOUT_S: 60,  // Max seconds to wait for Zoom Web to be ready
   };
+  // @@DOPPLER_CONFIG_END
 
   // ─────────────────────────────────────────────────────────────────────────────
   // STATE
