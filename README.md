@@ -343,8 +343,12 @@ zig build -Doptimize=ReleaseFast run
 
 Lightpanda accepts pull requests through GitHub.
 
-You have to sign our [CLA](CLA.md) during the pull request process otherwise
-we're not able to accept your contributions.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide, including
+the CLA signing process, commit conventions, and our preferred squash-merge workflow.
+
+> **TL;DR** — first-time contributors must sign the CLA by posting a comment
+> on their PR with the exact text:
+> `I have read the CLA Document and I hereby sign the CLA`
 
 ## Why?
 
