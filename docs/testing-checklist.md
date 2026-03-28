@@ -5,7 +5,7 @@ Manual QA checklist for `scripts/zoom-host-tools.user.js`.
 ## Prerequisites
 
 - [ ] Tampermonkey extension is installed in the test browser
-- [ ] `scripts/zoom-host-tools.user.js` is installed as a Tampermonkey userscript
+- [ ] The built userscript from `dist/zoom-host-tools.user.js` (or source `scripts/zoom-host-tools.user.js`) is installed in Tampermonkey
 - [ ] The test Zoom account has **host** or **co-host** privileges
 - [ ] A second Zoom account (participant) is available for testing
 
@@ -21,8 +21,8 @@ Manual QA checklist for `scripts/zoom-host-tools.user.js`.
 
 **Expected:**
 - `[ZoomHostAuto] Zoom Host Automation initializing…` appears in the console.
-- `[ZoomHostAuto] Zoom Host Automation active (interval: 2000ms)` appears in the console.
-- A floating debug panel is visible in the bottom-right corner of the page showing "🤖 Zoom Host Automation".
+- Console log matching pattern: `[ZoomHostAuto] Zoom Host Automation active (poll interval: \d+ms)`
+- If `DEBUG_MODE` is enabled in the build: A floating debug panel is visible in the bottom-right corner showing "🤖 Zoom Host Automation".
 
 **Pass / Fail:** ___
 
@@ -93,13 +93,14 @@ Manual QA checklist for `scripts/zoom-host-tools.user.js`.
 ### 6. Debug Logs Visible in Console
 
 **Steps:**
-1. Ensure `DEBUG_MODE = true` in the script (default).
+1. Test with a build where `DEBUG_MODE = true` (or use the source default).
 2. Open the meeting with the host account.
 3. Observe the DevTools console.
 
 **Expected:**
 - All `[ZoomHostAuto]` log lines appear in the console throughout the meeting.
-- No logs appear when `DEBUG_MODE` is set to `false`.
+- Debug panel is visible in bottom-right corner.
+- When tested with a build where `DEBUG_MODE = false`, no logs appear and no debug panel is shown.
 
 **Pass / Fail:** ___
 

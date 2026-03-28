@@ -13,7 +13,7 @@
  *   node scripts/build-userscript.js  # same as above
  *
  * Environment variables consumed (all optional — defaults mirror the source):
- *   ZOOM_DEBUG_MODE            boolean  "true" / "false"   (default: true)
+ *   ZOOM_DEBUG_MODE            boolean  "true" / "false"   (default: false)
  *   ZOOM_SCAN_INTERVAL         number   ms                 (default: 2000)
  *   ZOOM_SPAM_COOLDOWN_MS      number   ms                 (default: 10000)
  *   ZOOM_LIST_RETRY_INTERVAL   number   ms                 (default: 2000)
@@ -47,50 +47,56 @@ const DIST_FILE  = path.join(DIST_DIR, 'zoom-host-tools.user.js');
 
 const DEBUG_MODE          = process.env.ZOOM_DEBUG_MODE          !== undefined
     ? process.env.ZOOM_DEBUG_MODE.trim().toLowerCase() === 'true'
-    : true;
+    : false;
 
-const SCAN_INTERVAL       = process.env.ZOOM_SCAN_INTERVAL        !== undefined
-    ? parseInt(process.env.ZOOM_SCAN_INTERVAL, 10)
-    : 2000;
+// Helper to parse and validate numeric env vars
+function parseNumericEnv(name, defaultValue) {
+    if (process.env[name] === undefined) {
+        return defaultValue;
+    }
+    const raw = process.env[name].trim();
+    // Validate strict integer format
+    if (!/^\d+$/.test(raw)) {
+        console.error(`build-userscript: invalid value for ${name}: "${raw}" (must be a positive integer)`);
+        process.exit(1);
+    }
+    const value = parseInt(raw, 10);
+    if (!Number.isFinite(value) || value <= 0) {
+        console.error(`build-userscript: invalid value for ${name}: "${value}" (must be a positive integer)`);
+        process.exit(1);
+    }
+    return value;
+}
 
-const SPAM_COOLDOWN_MS    = process.env.ZOOM_SPAM_COOLDOWN_MS     !== undefined
-    ? parseInt(process.env.ZOOM_SPAM_COOLDOWN_MS, 10)
-    : 10000;
-
-const LIST_RETRY_INTERVAL = process.env.ZOOM_LIST_RETRY_INTERVAL  !== undefined
-    ? parseInt(process.env.ZOOM_LIST_RETRY_INTERVAL, 10)
-    : 2000;
+const SCAN_INTERVAL       = parseNumericEnv('ZOOM_SCAN_INTERVAL', 2000);
+const SPAM_COOLDOWN_MS    = parseNumericEnv('ZOOM_SPAM_COOLDOWN_MS', 10000);
+const LIST_RETRY_INTERVAL = parseNumericEnv('ZOOM_LIST_RETRY_INTERVAL', 2000);
 
 const SPAM_PATTERNS = process.env.ZOOM_SPAM_PATTERNS !== undefined
     ? process.env.ZOOM_SPAM_PATTERNS.split(',').map(s => s.trim()).filter(Boolean)
     : ['http://', 'https://', 't.me', 'bit.ly', 'discord.gg'];
 
-// Validate numeric values
-for (const [name, value] of [
-    ['ZOOM_SCAN_INTERVAL', SCAN_INTERVAL],
-    ['ZOOM_SPAM_COOLDOWN_MS', SPAM_COOLDOWN_MS],
-    ['ZOOM_LIST_RETRY_INTERVAL', LIST_RETRY_INTERVAL],
-]) {
-    if (!Number.isFinite(value) || value <= 0) {
-        console.error(`build-userscript: invalid value for ${name}: "${value}" (must be a positive integer)`);
-        process.exit(1);
-    }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Validate credentials (GH_PAT)
 //
-// GH_PAT must be present so CI fails fast rather than silently producing a
-// build that cannot write CLA signatures.  It is intentionally NOT embedded
-// in the output script — it is only validated here at build time.
+// GH_PAT is only required when signing is explicitly enabled via the SIGNING
+// environment variable. When SIGNING=1, the build will fail fast if GH_PAT is
+// missing. GH_PAT is intentionally NOT embedded in the output script — it is
+// only validated here at build time for signing workflows.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const GH_PAT = process.env.GH_PAT;
-if (!GH_PAT || GH_PAT.trim() === '') {
-    console.error('build-userscript: GH_PAT environment variable is not set.');
-    console.error('  Set it via Doppler (doppler secrets set GH_PAT <token>) or export it manually.');
-    console.error('  The token needs repo write access on the remote signatures repository (lightpanda-io/cla).');
-    process.exit(1);
+const signingEnabled = process.env.SIGNING === '1' || process.env.SIGNING === 'true';
+
+if (signingEnabled) {
+    const GH_PAT = process.env.GH_PAT;
+    if (!GH_PAT || GH_PAT.trim() === '') {
+        console.error('build-userscript: SIGNING is enabled but GH_PAT environment variable is not set.');
+        console.error('  Set it via Doppler (doppler secrets set GH_PAT) or export it manually.');
+        console.error('  The token needs repo write access on the remote signatures repository (lightpanda-io/cla).');
+        console.error('  To build without signing, omit the SIGNING environment variable.');
+        process.exit(1);
+    }
+    console.log('build-userscript: signing mode enabled — GH_PAT validated');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -161,6 +167,10 @@ console.log(`    SCAN_INTERVAL       = ${SCAN_INTERVAL} ms`);
 console.log(`    SPAM_COOLDOWN_MS    = ${SPAM_COOLDOWN_MS} ms`);
 console.log(`    LIST_RETRY_INTERVAL = ${LIST_RETRY_INTERVAL} ms`);
 console.log(`    SPAM_PATTERNS       = [${SPAM_PATTERNS.join(', ')}]`);
-console.log(`  credentials :`);
-console.log(`    GH_PAT              = ******** (set)`);
+if (signingEnabled) {
+    console.log(`  credentials :`);
+    console.log(`    GH_PAT              = ******** (validated for signing)`);
+} else {
+    console.log(`  signing             : disabled (set SIGNING=1 to enable)`);
+}
 console.log(`\nInstall dist/zoom-host-tools.user.js in TamperMonkey to use the built script.`);

@@ -22,7 +22,7 @@
     // ─────────────────────────────────────────────────────────────────────────
 
     // @@DOPPLER_CONFIG_START
-    const DEBUG_MODE = true;
+    const DEBUG_MODE = false;
     const SCAN_INTERVAL = 2000;       // milliseconds between participant poll scans
     const SPAM_COOLDOWN_MS = 10000;   // minimum ms between spam logs for the same sender
     const LIST_RETRY_INTERVAL = 2000; // ms between retries waiting for participant list container
@@ -46,18 +46,18 @@
     // ─────────────────────────────────────────────────────────────────────────
 
     const SELECTORS = {
-        participantList:      { primary: '.participants-list__list',              fallback: "[aria-label='Participants panel'] ul" },
-        participantRow:       { primary: '.participants-item',                    fallback: '.participants-list__item' },
-        participantName:      { primary: '.participants-item__name',              fallback: '.participants-list__item-name' },
-        raisedHandIcon:       { primary: '.participants-item__raised-hand-icon',  fallback: "[aria-label='Raise Hand'][class*='active']" },
-        participantMenuButton:{ primary: '.participants-item__more-btn',          fallback: "[aria-label='More options for participant']" },
-        multipinMenuOption:   { primary: "[aria-label='Allow to Multi-Pin']",     fallback: '[role="menuitem"]' },
-        menuItem:             { primary: '[role="menuitem"]',                     fallback: '.menu-item' },
-        chatSender:           { primary: '.chat-message__sender',                 fallback: '.chat-list__item-sender' },
-        cameraStatusIcon:     { primary: '.participants-item__camera-icon--off',  fallback: "[aria-label='Video off']" },
-        chatContainer:        { primary: '.chat-list__chat-virtualized',          fallback: '.chat-message-list' },
-        chatMessage:          { primary: '.chat-message__text',                   fallback: '.chat-list__item-content' },
-        chatInput:            { primary: '.chat-box__chat-input',                 fallback: "[aria-label='Type message here']" },
+        participantList:           { primary: ".participants-list__list", fallback: "[aria-label='Participants panel'] ul" },
+        participantRow:            { primary: ".participants-item", fallback: ".participants-list__item" },
+        participantName:           { primary: ".participants-item__name", fallback: ".participants-list__item-name" },
+        raisedHandIcon:            { primary: ".participants-item__raised-hand-icon", fallback: "[aria-label='Raise Hand'][class*='active']" },
+        participantMenuButton:     { primary: ".participants-item__more-btn", fallback: "[aria-label='More options for participant']" },
+        multipinMenuOption:        { primary: "[aria-label='Allow to Multi-Pin']", fallback: "[role='menuitem']" },
+        menuItem:                  { primary: "[role='menuitem']", fallback: ".menu-item" },
+        chatSender:                { primary: ".chat-message__sender", fallback: ".chat-list__item-sender" },
+        cameraStatusIcon:          { primary: ".participants-item__camera-icon--off", fallback: "[aria-label='Video off']" },
+        chatContainer:             { primary: ".chat-list__chat-virtualized", fallback: ".chat-message-list" },
+        chatMessage:               { primary: ".chat-message__text", fallback: ".chat-list__item-content" },
+        chatInput:                 { primary: ".chat-box__chat-input", fallback: "[aria-label='Type message here']" }
     };
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -135,6 +135,10 @@
         let nodes = Array.from(root.querySelectorAll(config.primary));
         if (nodes.length === 0 && config.fallback) {
             nodes = Array.from(root.querySelectorAll(config.fallback));
+            if (nodes.length > 0) {
+                stats.selectorFallbacks++;
+                updateDebugPanel('selectorFallbacks', stats.selectorFallbacks);
+            }
         }
         return nodes;
     }
@@ -189,7 +193,8 @@
      */
     const MULTIPIN = {
         NEEDS_GRANT:     'needs_grant',     // "Allow to Multi-Pin" visible → grant it
-        ALREADY_GRANTED: 'already_granted', // menu opened but option absent → already active
+        ALREADY_GRANTED: 'already_granted', // confirmed granted indicator present
+        UNKNOWN:         'unknown',         // menu opened but status unclear → retry
         ERROR:           'error',           // could not open/inspect menu → skip this cycle
     };
 
@@ -213,20 +218,43 @@
         await sleep(300);
 
         // Verify the menu actually opened before inspecting its contents
-        const menuOpenedCheck = resolve('menuItem');
-        if (!menuOpenedCheck) {
-            log(`checkMultipinStatus: menu did not open (no menu items visible)`);
+        // Search only within visible menu items
+        const menuItems = resolveAll('menuItem');
+        const visibleMenuItems = menuItems.filter(isVisible);
+        if (visibleMenuItems.length === 0) {
+            log(`checkMultipinStatus: menu did not open (no visible menu items)`);
             document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
             await sleep(200);
             return MULTIPIN.ERROR;
         }
 
+        // Pass document as root but rely on visibility filtering in resolveMultipinOption
         const option = resolveMultipinOption();
 
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
         await sleep(200);
 
-        return option ? MULTIPIN.NEEDS_GRANT : MULTIPIN.ALREADY_GRANTED;
+        if (option) {
+            return MULTIPIN.NEEDS_GRANT;
+        }
+
+        // Check if there's a "Disable Multi-Pin" option which indicates it's already granted
+        const disableOption = findMenuItemByText('Disable Multi-Pin');
+        if (disableOption) {
+            return MULTIPIN.ALREADY_GRANTED;
+        }
+
+        // Menu opened but we can't determine status - could be still populating
+        return MULTIPIN.UNKNOWN;
+    }
+
+    /**
+     * Checks if an element is visible in the DOM.
+     * @param {Element} el
+     * @returns {boolean}
+     */
+    function isVisible(el) {
+        return el.offsetParent !== null || el.getClientRects().length > 0;
     }
 
     /**
@@ -235,14 +263,15 @@
      * result does not contain the expected text (i.e. a generic fallback matched)
      * it falls back to a full text-content search across all visible menu items.
      *
+     * @param {Element} [root=document] - Menu container to scope search
      * @returns {Element|null}
      */
-    function resolveMultipinOption() {
-        const option = resolve('multipinMenuOption');
-        if (option && option.textContent && option.textContent.toLowerCase().includes('multi-pin')) {
+    function resolveMultipinOption(root = document) {
+        const option = resolve('multipinMenuOption', root);
+        if (option && isVisible(option) && option.textContent && option.textContent.toLowerCase().includes('multi-pin')) {
             return option;
         }
-        return findMenuItemByText('Allow to Multi-Pin');
+        return findMenuItemByText('Allow to Multi-Pin', root);
     }
 
     /**
@@ -251,12 +280,13 @@
      * scope can be updated centrally alongside other selectors.
      *
      * @param {string} text
+     * @param {Element} [root=document] - Menu container to scope search
      * @returns {Element|null}
      */
-    function findMenuItemByText(text) {
-        const items = resolveAll('menuItem');
+    function findMenuItemByText(text, root = document) {
+        const items = resolveAll('menuItem', root);
         for (const item of items) {
-            if (item.textContent && item.textContent.trim().toLowerCase().includes(text.toLowerCase())) {
+            if (isVisible(item) && item.textContent && item.textContent.trim().toLowerCase().includes(text.toLowerCase())) {
                 return item;
             }
         }
@@ -286,9 +316,10 @@
             menuButton.click();
             await sleep(400);
 
-            const menuOpenedCheck = resolve('menuItem');
-            if (!menuOpenedCheck) {
-                const reason = 'menu did not open (no menu items visible after click)';
+            const menuItems = resolveAll('menuItem');
+            const visibleMenuItems = menuItems.filter(isVisible);
+            if (visibleMenuItems.length === 0) {
+                const reason = 'menu did not open (no visible menu items after click)';
                 log(`grantMultipin attempt ${attempt}: ${reason} for "${name}"`);
                 stats.lastGrantResult = `FAIL (${reason})`;
                 updateDebugPanel('lastGrantResult', stats.lastGrantResult);
@@ -300,17 +331,30 @@
             const option = resolveMultipinOption();
             if (option) {
                 option.click();
-                processedParticipants.add(key);
-                stats.grants++;
-                stats.lastParticipant = name;
-                stats.lastGrantResult = 'SUCCESS';
-                stats.lastAction = `Granted Multi-Pin to ${name}`;
-                log(`✅ Granted Multi-Pin to "${name}" (key: ${key})`);
-                updateDebugPanel('grants', stats.grants);
-                updateDebugPanel('lastParticipant', stats.lastParticipant);
-                updateDebugPanel('lastGrantResult', stats.lastGrantResult);
-                updateDebugPanel('lastAction', stats.lastAction);
-                return;
+                await sleep(300);
+
+                // Verify the grant succeeded by re-checking status
+                document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+                await sleep(200);
+
+                const verifyStatus = await checkMultipinStatus(row);
+                if (verifyStatus === MULTIPIN.ALREADY_GRANTED || verifyStatus === MULTIPIN.UNKNOWN) {
+                    // Success: option toggled or menu shows granted state
+                    processedParticipants.add(key);
+                    stats.grants++;
+                    stats.lastParticipant = name;
+                    stats.lastGrantResult = 'SUCCESS';
+                    stats.lastAction = `Granted Multi-Pin to ${name}`;
+                    log(`✅ Granted Multi-Pin to "${name}" (key: ${key})`);
+                    updateDebugPanel('grants', stats.grants);
+                    updateDebugPanel('lastParticipant', stats.lastParticipant);
+                    updateDebugPanel('lastGrantResult', stats.lastGrantResult);
+                    updateDebugPanel('lastAction', stats.lastAction);
+                    return;
+                } else {
+                    log(`grantMultipin: click succeeded but verification failed for "${name}" — will retry`);
+                    continue;
+                }
             }
 
             const reason = `"Allow to Multi-Pin" option not found in open menu`;
@@ -407,6 +451,10 @@
                     log(`ℹ️  Multi-Pin already granted for "${name}" (key: ${key}); skipping`);
                     updateDebugPanel('lastParticipant', name);
                     updateDebugPanel('lastGrantResult', stats.lastGrantResult);
+                } else if (status === MULTIPIN.UNKNOWN) {
+                    // Menu opened but status unclear (may still be populating)
+                    // Do NOT mark as processed — will retry on next scan
+                    log(`⚠️  Multi-Pin status unclear for "${name}"; will retry on next scan`);
                 } else {
                     // status === MULTIPIN.ERROR: could not inspect menu this cycle
                     // Do NOT mark as processed — will retry on next scan
@@ -561,21 +609,43 @@
      * detection faster without replacing the reliable polling fallback.
      *
      * Uses the shared `isScanning` flag to prevent overlap with the poll loop.
+     *
+     * Also watches for the participant list node being replaced and automatically
+     * re-attaches the observer to the new container.
      */
     function watchParticipantList() {
-        const container = resolve('participantList');
+        let container = resolve('participantList');
         if (!container) return;
 
-        const observer = new MutationObserver(() => {
-            if (isScanning) return;
-            isScanning = true;
-            scanParticipants()
-                .catch(err => log(`watchParticipantList scan error: ${err.message}`))
-                .finally(() => { isScanning = false; });
-        });
+        let listObserver = null;
 
-        observer.observe(container, { childList: true, subtree: true });
-        log('Participant list observer attached');
+        function attachListObserver(target) {
+            if (listObserver) {
+                listObserver.disconnect();
+            }
+            listObserver = new MutationObserver(() => {
+                if (isScanning) return;
+                isScanning = true;
+                scanParticipants()
+                    .catch(err => log(`watchParticipantList scan error: ${err.message}`))
+                    .finally(() => { isScanning = false; });
+            });
+            listObserver.observe(target, { childList: true, subtree: true });
+            log('Participant list observer attached');
+        }
+
+        attachListObserver(container);
+
+        // Watch for container replacement (Zoom SPA re-renders)
+        const reconnectObserver = new MutationObserver(() => {
+            const current = resolve('participantList');
+            if (current && current !== container) {
+                log('watchParticipantList: participant list container replaced — reconnecting observer');
+                container = current;
+                attachListObserver(container);
+            }
+        });
+        reconnectObserver.observe(document.body, { childList: true, subtree: true });
     }
 
     // ─────────────────────────────────────────────────────────────────────────

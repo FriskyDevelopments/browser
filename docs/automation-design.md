@@ -193,12 +193,12 @@ Add the following secrets to your `zoom-host-automation` Doppler project:
 
 | Secret name              | Type    | Default      | Description |
 |--------------------------|---------|--------------|-------------|
-| `ZOOM_DEBUG_MODE`        | boolean | `true`       | Enables the floating debug panel and console logging |
+| `ZOOM_DEBUG_MODE`        | boolean | `false`      | Enables the floating debug panel and console logging |
 | `ZOOM_SCAN_INTERVAL`     | number  | `2000`       | ms between polling scans of the participant list |
 | `ZOOM_SPAM_COOLDOWN_MS`  | number  | `10000`      | Minimum ms between spam log entries for the same sender |
 | `ZOOM_LIST_RETRY_INTERVAL` | number | `2000`      | ms between retries waiting for the participant list container |
 | `ZOOM_SPAM_PATTERNS`     | string  | (built-in)   | Comma-separated list of spam URL patterns to detect |
-| `GH_PAT`                 | string  | —            | GitHub Personal Access Token with repo write access. Required to write CLA signatures to the remote organisation repository (`lightpanda-io/cla`). Grant: `repo` (full) or `contents:write` on the target repo. |
+| `GH_PAT`                 | string  | —            | GitHub Personal Access Token with repo write access. **Only required when signing builds** (see `SIGNING` flag below). Used to write CLA signatures to the remote organisation repository (`lightpanda-io/cla`). Grant: `repo` (full) or `contents:write` on the target repo. Not required for standard builds. |
 
 ### How the build works
 
@@ -208,14 +208,17 @@ Add the following secrets to your `zoom-host-automation` Doppler project:
 4. The finished script is written to `dist/zoom-host-tools.user.js`.
 
 ```bash
-# Build with Doppler (recommended for production)
+# Build with source defaults (no Doppler secrets needed)
+npm run build
+
+# Build with Doppler config overrides (GH_PAT only injected if SIGNING is set)
 doppler run -- npm run build
 
 # Build with manually set environment variables
 ZOOM_DEBUG_MODE=false ZOOM_SCAN_INTERVAL=3000 npm run build
 
-# Build with source defaults (same result as installing the source directly)
-npm run build
+# Build with signing enabled (requires GH_PAT)
+SIGNING=1 doppler run -- npm run build
 ```
 
 ### Deploying the built script
@@ -238,10 +241,16 @@ A pre-configured devcontainer (`.devcontainer/devcontainer.json`) is included so
    doppler login
    doppler setup   # select project: zoom-host-automation, config: dev
    ```
-4. Add the GitHub Personal Access Token to Doppler (needed to write CLA signatures):
+4. (Optional) Add the GitHub Personal Access Token to Doppler if you need to sign builds for CLA writing:
    ```bash
-   doppler secrets set GH_PAT <your-github-pat>
+   # Use interactive/masked prompt to avoid exposing token in shell history:
+   doppler secrets set GH_PAT
+   # Doppler will prompt: Enter secret value for GH_PAT:
+   # Paste your token and press Enter
    # PAT requires repo write access on the lightpanda-io/cla repository
+
+   # Or inject from a secure environment variable:
+   echo "$SECURE_GH_PAT" | doppler secrets set GH_PAT
    ```
 5. Build the userscript with your Doppler secrets:
    ```bash

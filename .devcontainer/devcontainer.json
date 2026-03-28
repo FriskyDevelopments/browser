@@ -1,7 +1,7 @@
 {
   "name": "Zoom Host Automation",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bullseye",
-  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postCreateCommand": "doppler run -- bash .devcontainer/setup.sh",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -16,8 +16,7 @@
     }
   },
   "remoteEnv": {
-    "DOPPLER_TOKEN": "${localEnv:DOPPLER_TOKEN}",
-    "GH_PAT": "${localEnv:GH_PAT}"
+    "DOPPLER_TOKEN": "${localEnv:DOPPLER_TOKEN}"
   },
   "features": {}
 }
