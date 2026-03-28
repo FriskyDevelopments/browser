@@ -7,7 +7,7 @@ on:
 
 permissions:
   actions: write
-  contents: read
+  contents: write
   pull-requests: write
   statuses: write
 
@@ -22,13 +22,9 @@ jobs:
         uses: contributor-assistant/github-action@v2.6.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PERSONAL_ACCESS_TOKEN: ${{ secrets.CLA_GH_PAT }}
         with:
           path-to-signatures: 'signatures/browser/version1/cla.json'
           path-to-document: 'https://github.com/lightpanda-io/browser/blob/main/CLA.md'
           # branch should not be protected
           branch: 'main'
-          allowlist: krichprollsch,francisbouvier,katie-lpd,sjorsdonkers,bornlex
-
-          remote-organization-name: lightpanda-io
-          remote-repository-name: cla
+          allowlist: krichprollsch,francisbouvier,katie-lpd,sjorsdonkers,bornlex,FriskyDevelopments,copilot-swe-agent[bot]
