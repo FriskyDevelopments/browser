@@ -40,9 +40,6 @@ jobs:
     permissions:
       contents: read
 
-    env:
-      GITHUB_TOKEN: ${{ secrets.MASTERKEYGITHUB }}
-
     steps:
       - uses: actions/checkout@v4
         with:
