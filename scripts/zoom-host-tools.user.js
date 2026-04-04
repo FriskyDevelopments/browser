@@ -217,10 +217,10 @@
         menuButton.click();
         await sleep(300);
 
-        // Verify the menu actually opened before inspecting its contents
-        // Search only within visible menu items
-        const menuItems = resolveAll('menuItem');
-        const visibleMenuItems = menuItems.filter(isVisible);
+        // Find the opened menu container by looking for visible menu items
+        // Zoom typically renders menus as siblings or in a portal near the body
+        const allMenuItems = resolveAll('menuItem');
+        const visibleMenuItems = allMenuItems.filter(isVisible);
         if (visibleMenuItems.length === 0) {
             log(`checkMultipinStatus: menu did not open (no visible menu items)`);
             document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -228,8 +228,14 @@
             return MULTIPIN.ERROR;
         }
 
-        // Pass document as root but rely on visibility filtering in resolveMultipinOption
-        const option = resolveMultipinOption();
+        // Find the common menu container (parent of visible menu items)
+        // Use the closest common ancestor or the first visible item's parent menu container
+        let menuRoot = visibleMenuItems[0].closest('[role="menu"]') ||
+                       visibleMenuItems[0].closest('.participant-context-menu') ||
+                       visibleMenuItems[0].parentElement;
+
+        // Scope all subsequent queries to this menu container
+        const option = resolveMultipinOption(menuRoot);
 
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
         await sleep(200);
@@ -239,7 +245,7 @@
         }
 
         // Check if there's a "Disable Multi-Pin" option which indicates it's already granted
-        const disableOption = findMenuItemByText('Disable Multi-Pin');
+        const disableOption = findMenuItemByText('Disable Multi-Pin', menuRoot);
         if (disableOption) {
             return MULTIPIN.ALREADY_GRANTED;
         }
@@ -316,8 +322,8 @@
             menuButton.click();
             await sleep(400);
 
-            const menuItems = resolveAll('menuItem');
-            const visibleMenuItems = menuItems.filter(isVisible);
+            const allMenuItems = resolveAll('menuItem');
+            const visibleMenuItems = allMenuItems.filter(isVisible);
             if (visibleMenuItems.length === 0) {
                 const reason = 'menu did not open (no visible menu items after click)';
                 log(`grantMultipin attempt ${attempt}: ${reason} for "${name}"`);
@@ -328,7 +334,12 @@
                 continue;
             }
 
-            const option = resolveMultipinOption();
+            // Find the menu container to scope queries
+            let menuRoot = visibleMenuItems[0].closest('[role="menu"]') ||
+                           visibleMenuItems[0].closest('.participant-context-menu') ||
+                           visibleMenuItems[0].parentElement;
+
+            const option = resolveMultipinOption(menuRoot);
             if (option) {
                 option.click();
                 await sleep(300);
