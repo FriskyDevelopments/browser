@@ -1,0 +1,101 @@
+name: Qwen Code Assistant
+
+# On-demand automator. Mention "@qwen-code" in an issue or pull request comment
+# to have Qwen Code perform a task: answer a question, implement a change, fix a
+# failing check, etc. On a PR, code changes are committed to the PR branch.
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+concurrency:
+  group: qwen-assistant-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  assist:
+    # Only respond to "@qwen-code" mentions from users who can write to the repo.
+    if: >
+      contains(github.event.comment.body, '@qwen-code') &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: React to request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api -X POST \
+            "repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -f content='eyes' || true
+
+      - name: Determine PR context
+        id: ctx
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NUMBER="${{ github.event.issue.number || github.event.pull_request.number }}"
+          echo "number=${NUMBER}" >> "$GITHUB_OUTPUT"
+          IS_PR="false"
+          if [ -n "${{ github.event.pull_request.number }}" ] || [ -n "${{ github.event.issue.pull_request }}" ]; then
+            IS_PR="true"
+            BRANCH=$(gh pr view "$NUMBER" --repo "${{ github.repository }}" --json headRefName -q .headRefName)
+            echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "is_pr=${IS_PR}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.ctx.outputs.branch || github.ref }}
+
+      - name: Configure git
+        if: steps.ctx.outputs.is_pr == 'true'
+        run: |
+          git config user.name "qwen-code[bot]"
+          git config user.email "qwen-code-bot@users.noreply.github.com"
+
+      - name: Qwen Code assistant
+        uses: QwenLM/qwen-code-action@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUMBER: ${{ steps.ctx.outputs.number }}
+          IS_PR: ${{ steps.ctx.outputs.is_pr }}
+          BRANCH: ${{ steps.ctx.outputs.branch }}
+          REPO: ${{ github.repository }}
+          REQUEST: ${{ github.event.comment.body }}
+        with:
+          openai_api_key: ${{ secrets.QWEN_API_KEY }}
+          openai_base_url: ${{ vars.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1' }}
+          openai_model: ${{ vars.QWEN_MODEL || 'qwen-coder-plus-latest' }}
+          prompt: |
+            You are an automation assistant for the ${REPO} repository. If a
+            CLAUDE.md, AGENTS.md, or README is present, read it and follow its
+            conventions. The GitHub CLI `gh` is installed and authenticated via
+            GITHUB_TOKEN.
+
+            A maintainer mentioned you on item #${NUMBER}. Their request:
+            ---
+            ${REQUEST}
+            ---
+
+            Instructions:
+            - Strip the "@qwen-code" mention and act on the remaining request.
+            - Use `gh` to read context (`gh issue view`, `gh pr view`, `gh pr diff`).
+            - If this is a pull request (IS_PR=${IS_PR}) and the task requires code
+              changes: make the edits in the working tree, run the project's test
+              command if one is obvious, then commit and push to the PR branch
+              "${BRANCH}":
+                git add -A && git commit -m "<message>" && git push origin HEAD:${BRANCH}
+            - If it is an issue or a question, do the analysis and reply.
+            - Always finish by posting a short summary of what you did with
+              `gh issue comment ${NUMBER} --body "<markdown>"` (works for PRs too).
+            - Keep changes minimal and scoped to the request. Never commit secrets.
