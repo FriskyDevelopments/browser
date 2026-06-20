@@ -1,0 +1,57 @@
+name: Qwen Code Triage
+
+# Triages newly opened issues with Qwen Code: applies labels and posts a short
+# triage summary. Also runnable on demand via a "/triage" maintainer comment.
+
+on:
+  issues:
+    types: [opened, reopened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  triage:
+    if: >
+      github.event_name == 'issues' ||
+      (
+        github.event_name == 'issue_comment' &&
+        !github.event.issue.pull_request &&
+        startsWith(github.event.comment.body, '/triage') &&
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Qwen Code triage
+        uses: QwenLM/qwen-code-action@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        with:
+          openai_api_key: ${{ secrets.QWEN_API_KEY }}
+          openai_base_url: ${{ vars.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1' }}
+          openai_model: ${{ vars.QWEN_MODEL || 'qwen-coder-plus-latest' }}
+          prompt: |
+            You are the issue triager for the ${REPO} repository. The GitHub CLI
+            `gh` is installed and authenticated via GITHUB_TOKEN.
+
+            Triage issue #${ISSUE_NUMBER}.
+
+            Steps:
+            1. Read it: `gh issue view ${ISSUE_NUMBER} --json title,body,labels`.
+            2. List existing labels: `gh label list --limit 100`.
+            3. Choose only labels that already exist (do not invent new ones) and
+               apply them: `gh issue edit ${ISSUE_NUMBER} --add-label "<name>"`.
+               Classify by kind (bug/enhancement/question/documentation).
+            4. Post a 2-3 sentence triage note with
+               `gh issue comment ${ISSUE_NUMBER} --body "<markdown>"` describing the
+               category and, if it is a bug, what information is still needed.
+            Do not modify any code.

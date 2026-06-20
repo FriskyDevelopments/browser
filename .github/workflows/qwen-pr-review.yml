@@ -1,0 +1,78 @@
+name: Qwen Code Review
+
+# Automatically reviews pull requests with Qwen Code, and re-reviews on demand
+# when a maintainer comments "/review" on a PR.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: qwen-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    # Run on PR events, or on a "/review" comment posted on a pull request by a
+    # user who can write to the repo (guards against abuse from arbitrary commenters).
+    if: >
+      github.event_name == 'pull_request' ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        startsWith(github.event.comment.body, '/review') &&
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Resolve PR number
+        id: pr
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Qwen Code review
+        uses: QwenLM/qwen-code-action@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          REPO: ${{ github.repository }}
+        with:
+          openai_api_key: ${{ secrets.QWEN_API_KEY }}
+          openai_base_url: ${{ vars.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1' }}
+          openai_model: ${{ vars.QWEN_MODEL || 'qwen-coder-plus-latest' }}
+          prompt: |
+            You are the code reviewer for the ${REPO} repository. If a CLAUDE.md,
+            AGENTS.md, or README is present, read it first and apply its
+            conventions. The GitHub CLI `gh` is installed and authenticated via
+            GITHUB_TOKEN.
+
+            Review pull request #${PR_NUMBER}.
+
+            Steps:
+            1. Run `gh pr view ${PR_NUMBER} --json title,body,headRefName,baseRefName`
+               and `gh pr diff ${PR_NUMBER}` to read the change.
+            2. Review the diff for: correctness bugs, security issues (leaked
+               secrets/tokens, unsafe input handling), error handling, and missing
+               or broken tests.
+            3. Post a single concise review summary with
+               `gh pr comment ${PR_NUMBER} --body "<markdown>"`. Group findings by
+               severity (Blocking / Should fix / Nit). If you find nothing of note,
+               say the PR looks good. Reference files as `path:line`. Do NOT modify
+               any files — review only.
